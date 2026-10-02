@@ -1,0 +1,421 @@
+:root {
+  --wood-1: #6f3b20;
+  --wood-2: #8a4a26;
+  --wood-3: #5a2c18;
+  --paper: #faf7ee;
+  --paper-edge: #d9cfb8;
+  /* The cover boards (spine, edges, the rim around the pages): the light
+     tones of the cover picture. flip-renderer.js reads these too, so the
+     turning cover has exactly the same colours. Hex values only. */
+  --board-top: #f4f5f7;
+  --board-mid: #e9ebef;
+  --board-bottom: #dcdfe5;
+  --board-edge: #b7bcc6;
+  --ink: #efe9df;
+  --panel: rgba(21, 21, 22, 0.95);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: #2b150b;
+  overflow: hidden;
+}
+
+/* ---------- desk ---------- */
+.app-shell {
+  height: 100vh; height: 100dvh;
+  display: grid;
+  grid-template-rows: 54px minmax(0, 1fr) 62px;
+  background:
+    radial-gradient(ellipse 70% 60% at 62% 30%, rgba(255, 236, 200, .16), transparent 70%),
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, .018) 0 1px, rgba(0, 0, 0, .02) 1px 3px),
+    linear-gradient(90deg, var(--wood-3), var(--wood-2) 22%, var(--wood-1) 48%, #8b4b28 74%, #5d301b);
+  transition: filter .35s ease;
+}
+/* Night mode only dims the presentation around and over the page. */
+body.night .app-shell,
+body.night .flip-canvas { filter: brightness(.62) saturate(.9); }
+
+.topbar, .footerbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 22px;
+  position: relative; z-index: 20;
+}
+.topbar { border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.brand { font-family: Georgia, serif; font-size: 18px; letter-spacing: .2px; }
+.top-actions { display: flex; align-items: center; gap: 10px; }
+.ghost-pill, .icon-btn, .xbtn, .player-pill, #jumpBtn {
+  border: 1px solid rgba(255, 255, 255, .2); color: #fff; background: rgba(20, 20, 20, .65); cursor: pointer;
+  font: inherit;
+}
+.ghost-pill { border-radius: 999px; padding: 8px 13px; font-size: 13px; }
+.icon-btn { width: 34px; height: 34px; border-radius: 50%; }
+
+/* ---------- stage & book ---------- */
+.stage { position: relative; min-height: 0; overflow: visible; }
+
+.book {
+  position: absolute;
+  width: calc(var(--page-w, 300px) * 2);
+  height: var(--page-h, 420px);
+  --stack-left: 5px;
+  --stack-right: 5px;
+  /* Set by book-view.js. --cf / --cb: how far the book is closed with the
+     front / back cover up (0 = open spread, 1 = closed, in between while the
+     cover is turning). --left-open / --right-open: whether a board rests on
+     that side (the cover in the air *is* that board). */
+  --cf: 0;
+  --cb: 0;
+  --closed: 0;
+  --left-open: 1;
+  --right-open: 1;
+  --left-gap: calc(var(--page-w, 300px) * (1 - var(--left-open)));
+  --right-gap: calc(var(--page-w, 300px) * (1 - var(--right-open)));
+  /* Where the spine is, measured from the left edge of what lies on the desk. */
+  --spine-x: calc(var(--page-w, 300px) - var(--left-gap));
+  /* How far the page block and lower board show below the closed cover. */
+  --closed-drop: calc((var(--board-t) + 6px) * var(--closed));
+  --board-scale: 1.03;
+  --board-x: 14px;
+  --board-y: 10px;
+  --board-t: 6px;
+  /* The closed book lies centred; it slides over as the cover opens. */
+  /* One-page mode (book-view.js): the closed book needs no centring there,
+     and --pan brings the page in focus to the middle. */
+  --cover-shift: .5;
+  --pan: 0px;
+  transform: translateX(calc(var(--page-w, 300px) * var(--cover-shift) * (var(--cf) - var(--cb)) + var(--pan)));
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.book.single { --cover-shift: 0; }
+.book.panning { transition: transform .34s cubic-bezier(.3, .1, .2, 1); }
+
+/* Soft shadow of the whole book on the desk; the light comes from upper right. */
+.book-shadow {
+  position: absolute; inset: 0 -14px -12px -14px;
+  left: calc(var(--left-gap) - 14px);
+  right: calc(var(--right-gap) - 14px);
+  bottom: calc(-12px - var(--closed-drop));
+  border-radius: 10px;
+  box-shadow:
+    -10px 14px 22px rgba(0, 0, 0, .34),
+    -26px 34px 60px rgba(0, 0, 0, .38),
+    0 2px 6px rgba(0, 0, 0, .4);
+}
+
+/* Hard cover lying open under the page blocks. */
+.cover {
+  position: absolute;
+  inset: calc(var(--board-y) * -1) calc(var(--board-x) * -1);
+  /* Closed, only the lower board is left: it ends just past the spine and
+     shows below the page block, as a book seen slightly from the front does. */
+  left: calc(var(--left-gap) - var(--board-x));
+  right: calc(var(--right-gap) - var(--board-x));
+  bottom: calc(var(--board-y) * -1 - var(--closed-drop));
+  border-radius: 5px;
+  background:
+    linear-gradient(90deg, transparent calc(var(--spine-x) - 1px), rgba(40, 50, 70, .28) calc(var(--spine-x) + var(--board-x)), transparent calc(var(--spine-x) + var(--board-x) * 2 + 1px)),
+    linear-gradient(180deg, var(--board-top), var(--board-mid) 60%, var(--board-bottom));
+  /* The outline keeps the light board visible; the last shadow is its thickness. */
+  box-shadow:
+    inset 0 0 0 1px rgba(90, 100, 120, .45),
+    inset 0 -3px 5px rgba(40, 50, 70, .14),
+    0 var(--board-t) 0 var(--board-edge);
+}
+
+/* Page blocks: the edges of the leaves lying under the visible page. They sit
+   outside the page area, so the PDF canvas is never covered or cropped. */
+.stack {
+  position: absolute; top: 1px;
+  height: calc(100% + 3px + (var(--board-y) + var(--closed-drop) - 3px) * var(--closed));
+  width: calc(50% + 2px);
+  background: linear-gradient(180deg, #efe9d8 calc(100% - 4px), #cfc5ac);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+}
+/* Fore-edge: the individual leaves seen from the side. */
+.stack::before {
+  content: ""; position: absolute; top: 0; bottom: 3px;
+}
+.stack-left {
+  opacity: var(--left-open);
+  left: calc(var(--stack-left) * -1);
+  border-radius: 3px 0 0 4px;
+  transition: left .4s ease;
+}
+.stack-left::before {
+  left: 0; width: var(--stack-left);
+  background: repeating-linear-gradient(90deg, rgba(120, 100, 70, .45) 0 1px, transparent 1px 2.5px);
+}
+.stack-right {
+  opacity: var(--right-open);
+  right: calc(var(--stack-right) * -1);
+  border-radius: 0 3px 4px 0;
+  transition: right .4s ease;
+}
+.stack-right::before {
+  right: 0; width: var(--stack-right);
+  background: repeating-linear-gradient(270deg, rgba(120, 100, 70, .45) 0 1px, transparent 1px 2.5px);
+}
+
+/* Inside of the cover, visible where there is no page. */
+.endpaper {
+  position: absolute; inset: 0;
+  left: var(--left-gap);
+  right: var(--right-gap);
+  background:
+    linear-gradient(90deg, transparent calc(var(--spine-x) - 26px), rgba(0, 0, 0, .28) var(--spine-x), transparent calc(var(--spine-x) + 26px)),
+    #e9dfc6;
+}
+
+.page {
+  position: absolute; top: 0;
+  width: var(--page-w, 300px);
+  height: var(--page-h, 420px);
+  background: var(--paper);
+  overflow: hidden;
+}
+.page-left { left: 0; border-radius: 2px 0 0 2px; }
+.page-right { left: var(--page-w, 300px); border-radius: 0 2px 2px 0; }
+.page.is-empty { visibility: hidden; }
+/* A cover seen from outside: its artwork fills the whole board, which is a
+   little larger than the pages and grows out from the spine. */
+.page.is-cover {
+  transform: scale(var(--board-scale));
+  z-index: 2;
+  background: var(--board-mid);
+  box-shadow: 0 0 0 1px rgba(90, 100, 120, .45);
+  cursor: pointer;
+}
+.page-left.is-cover { transform-origin: 100% 50%; border-radius: 4px 0 0 4px; }
+.page-right.is-cover { transform-origin: 0 50%; border-radius: 0 4px 4px 0; }
+/* No gutter on a board: just the groove where the cover hinges. */
+.page-left.is-cover .page-shade {
+  background: linear-gradient(to left,
+    rgba(0, 0, 0, .22) 0, rgba(0, 0, 0, .05) 1.2%, rgba(255, 255, 255, .12) 2.6%,
+    rgba(0, 0, 0, .12) 4%, transparent 6.5%) !important;
+}
+.page-right.is-cover .page-shade {
+  background: linear-gradient(to right,
+    rgba(0, 0, 0, .22) 0, rgba(0, 0, 0, .05) 1.2%, rgba(255, 255, 255, .12) 2.6%,
+    rgba(0, 0, 0, .12) 4%, transparent 6.5%) !important;
+}
+
+/* The PDF page itself: exactly what PDF.js rendered, shown 1:1. */
+.pdf-canvas {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+}
+
+.highlight-layer, .hotspot-layer, .page-shade { position: absolute; inset: 0; }
+.highlight-layer { z-index: 2; pointer-events: none; }
+/* The verse being recited: a grey shade over its Arabic text and its translation. */
+.highlight { position: absolute; border-radius: 3px; background: rgba(72, 76, 88, .2); mix-blend-mode: multiply; }
+.hotspot-layer { z-index: 3; pointer-events: none; }
+.hotspot { position: absolute; pointer-events: auto; background: transparent; border: 0; padding: 0; cursor: pointer; }
+.hotspot.hover { background: rgba(72, 76, 88, .07); border-radius: 3px; }
+.hotspot-layer.debug .hotspot { background: rgba(0, 145, 255, .12); outline: 1px dashed rgba(0, 145, 255, .75); }
+/* Curvature of the paper towards the spine (gradient set from config.js). */
+.page-shade { z-index: 4; pointer-events: none; }
+.book.is-turning .hotspot { pointer-events: none; }
+
+.loading {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  font-size: 13px; color: #5b4a33; z-index: 6;
+}
+.loading[hidden] { display: none; }
+
+/* Overlay for the turning sheet. Transparent, never takes input. */
+.flip-canvas {
+  position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh;
+  z-index: 30; pointer-events: none;
+  visibility: hidden;
+}
+.flip-canvas.active { visibility: visible; }
+/* The landed sheet dissolves over the identical DOM page beneath it. */
+.flip-canvas.fading { opacity: 0; transition: opacity .17s ease-out; }
+
+/* ---------- reading zoom ---------- */
+/* The camera moves in on the book: .book is scaled and panned (zoom-view.js). */
+.book { transform-origin: 0 0; }
+.book.zoom-anim { transition: transform .46s cubic-bezier(.3, .1, .2, 1); }
+/* Keep the enlarged book inside the stage, clear of the top and bottom bars. */
+.stage.is-zoomed { overflow: hidden; }
+.stage.is-zoomed .hint { opacity: 0; }
+
+.zoom-view { position: absolute; inset: 0; z-index: 12; }
+.zoom-view[hidden] { display: none; }
+.zoom-scroll {
+  position: absolute; inset: 0;
+  overflow-x: hidden; overflow-y: auto;
+  padding: 18px 0 26px;
+  touch-action: pan-y;
+  outline: none;
+  cursor: zoom-out;
+  scrollbar-color: rgba(255, 255, 255, .35) transparent;
+}
+/* Transparent stand-in for the zoomed page; gives the scroller its height. */
+.zoom-page {
+  position: relative; margin: 0 auto;
+  user-select: none; -webkit-user-select: none;
+}
+.zoom-close {
+  position: absolute; top: 12px; right: 26px; z-index: 2;
+  border: 1px solid rgba(255, 255, 255, .25); border-radius: 999px;
+  background: rgba(20, 20, 20, .82); color: #fff; font: inherit; font-size: 13px;
+  padding: 8px 14px; cursor: pointer;
+  opacity: 0; transition: opacity .2s ease;
+}
+.zoom-view.open .zoom-close { opacity: 1; }
+
+.hint {
+  position: absolute; left: 0; right: 0; bottom: 2px;
+  text-align: center; font-size: 12px; opacity: .6; pointer-events: none;
+}
+
+/* ---------- chrome ---------- */
+.footerbar { border-top: 1px solid rgba(255, 255, 255, .07); justify-content: center; gap: 14px; }
+.turn-btn {
+  width: 44px; height: 44px; border-radius: 50%; flex: none;
+  border: 1px solid rgba(255, 255, 255, .22); background: rgba(20, 20, 20, .65); color: #fff;
+  font: inherit; font-size: 26px; line-height: 1; padding: 0 0 4px; cursor: pointer;
+  /* Quick repeated taps must not zoom the page or select text. */
+  touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  transition: background .12s ease, transform .08s ease;
+}
+.turn-btn:hover { background: rgba(50, 50, 50, .8); }
+.turn-btn:active { transform: scale(.92); background: rgba(80, 80, 80, .85); }
+.credits { font-size: 11px; opacity: .7; position: absolute; left: 22px; }
+.player-pill {
+  margin: 0; border-radius: 999px; display: flex; align-items: center; gap: 6px;
+  padding: 6px 18px 6px 8px; min-width: 300px; text-align: left; cursor: default;
+}
+.player-text { margin-left: 6px; min-width: 0; }
+.player-text strong, .player-text small { display: block; line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-text strong { font-size: 12px; font-weight: 600; }
+.player-text small { font-size: 10px; opacity: .65; margin-top: 2px; }
+.play-dot {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: #fff; color: #111; font-size: 12px; border: 0; padding: 0; cursor: pointer;
+}
+.play-dot:active { transform: scale(.93); }
+.player-step {
+  width: 26px; height: 26px; flex: none; border: 0; border-radius: 50%; padding: 0;
+  background: transparent; color: rgba(255, 255, 255, .8); font-size: 12px; cursor: pointer;
+}
+.player-step:hover { background: rgba(255, 255, 255, .12); }
+.player-pill.is-loading .play-dot { opacity: .6; }
+
+.settings-panel {
+  position: fixed; z-index: 40; right: 18px; top: 58px; width: min(360px, calc(100vw - 36px));
+  background: var(--panel); border: 1px solid rgba(255, 255, 255, .14); border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .4); padding: 12px;
+  transform: translateY(-8px) scale(.98); opacity: 0; pointer-events: none; transition: .17s ease;
+}
+.settings-panel.open { transform: none; opacity: 1; pointer-events: auto; }
+.settings-head { display: flex; justify-content: space-between; align-items: center; padding: 2px 2px 8px; }
+.xbtn { width: 28px; height: 28px; border-radius: 50%; font-size: 18px; line-height: 1; }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 6px; border-top: 1px solid rgba(255, 255, 255, .08); }
+.setting-row b, .setting-row small { display: block; }
+.setting-row b { font-size: 12px; }
+.setting-row small { opacity: .6; font-size: 10px; margin-top: 3px; }
+.setting-row.stacked { align-items: end; }
+.setting-row.stacked span { margin-right: auto; }
+.setting-row select { background: #111; color: #fff; border: 1px solid #555; border-radius: 8px; padding: 8px; font: inherit; font-size: 12px; }
+.setting-row input[type="number"] { width: 72px; background: #111; color: #fff; border: 1px solid #555; border-radius: 8px; padding: 8px; }
+#jumpBtn { padding: 8px 10px; border-radius: 8px; }
+
+/* ---------- "Navigera i Koranen" ---------- */
+.nav-btn { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; }
+.nav-panel {
+  position: fixed; z-index: 45; top: 60px; left: 50%; transform: translateX(-50%);
+  width: min(430px, calc(100vw - 24px));
+  max-height: min(640px, calc(100vh - 84px));
+  display: flex; flex-direction: column;
+  background: var(--panel); color: #fff;
+  border: 1px solid rgba(255, 255, 255, .14); border-radius: 14px;
+  box-shadow: 0 18px 45px rgba(0, 0, 0, .45);
+  padding: 12px;
+}
+.nav-panel[hidden] { display: none; }
+.nav-head { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; }
+.nav-tabs { flex: 1; display: flex; background: rgba(255, 255, 255, .08); border-radius: 999px; padding: 3px; }
+.nav-tabs button {
+  flex: 1; border: 0; border-radius: 999px; background: transparent; color: rgba(255, 255, 255, .72);
+  font: inherit; font-size: 13px; padding: 7px 4px; cursor: pointer;
+}
+.nav-tabs button.active { background: #111; color: #fff; }
+.nav-body { display: flex; gap: 10px; min-height: 0; flex: 1; }
+.nav-column { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.nav-body.two-columns .nav-column:last-child { flex: 0 0 34%; }
+.nav-search {
+  width: 100%; background: rgba(255, 255, 255, .09); color: #fff; border: 1px solid transparent;
+  border-radius: 10px; padding: 9px 12px; font: inherit; font-size: 13px; outline: none;
+}
+.nav-search:focus { border-color: rgba(255, 255, 255, .35); }
+.nav-search::placeholder { color: rgba(255, 255, 255, .45); }
+.nav-list {
+  margin-top: 8px; overflow-y: auto; min-height: 120px; flex: 1;
+  scrollbar-color: rgba(255, 255, 255, .3) transparent;
+}
+.nav-item {
+  display: flex; align-items: baseline; gap: 12px; width: 100%;
+  border: 0; border-radius: 8px; background: transparent; color: #fff;
+  font: inherit; font-size: 14px; text-align: left; padding: 8px 10px; cursor: pointer;
+}
+.nav-item:hover, .nav-item:focus-visible { background: rgba(255, 255, 255, .1); outline: none; }
+.nav-item.active { background: rgba(255, 255, 255, .16); }
+.nav-key { flex: none; min-width: 26px; color: rgba(255, 255, 255, .6); font-variant-numeric: tabular-nums; }
+.nav-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-hint { flex: none; font-size: 11px; color: rgba(255, 255, 255, .45); }
+.nav-empty { padding: 14px 10px; font-size: 13px; color: rgba(255, 255, 255, .5); }
+@media (max-width: 560px) {
+  .brand { display: none; }
+  .nav-btn { position: static; transform: none; }
+}
+
+.toast {
+  position: fixed; z-index: 50; left: 50%; bottom: 74px; transform: translate(-50%, 12px); opacity: 0;
+  background: rgba(16, 16, 17, .92); border: 1px solid rgba(255, 255, 255, .16); color: #fff;
+  border-radius: 999px; padding: 9px 14px; font-size: 12px; pointer-events: none; transition: .2s ease;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+@media (max-width: 720px) {
+  .credits, .hint { display: none; }
+  .player-pill { min-width: 0; flex: 1; }
+  .topbar, .footerbar { padding: 0 12px; }
+  .top-actions { gap: 6px; }
+  .ghost-pill { padding: 7px 10px; font-size: 12px; }
+}
+/* Phones: pages are turned with a swipe, the arrow buttons would only crowd the player. */
+@media (max-width: 560px) {
+  .turn-btn { display: none; }
+}
+/* A phone lying on its side (two pages): keep the bars out of the book's way. */
+@media (max-height: 520px) and (orientation: landscape) {
+  .app-shell { grid-template-rows: 40px minmax(0, 1fr) 46px; }
+  .brand, .credits { display: none; }
+  .nav-btn { position: static; transform: none; }
+  .icon-btn { width: 30px; height: 30px; }
+  .turn-btn { width: 36px; height: 36px; font-size: 22px; }
+  .play-dot { width: 30px; height: 30px; }
+  .player-pill { padding: 4px 14px 4px 6px; }
+  .nav-panel { top: 44px; max-height: calc(100vh - 52px); }
+}
+/* The full-screen button is for screens that show one page at a time. */
+#fullscreenBtn { display: none; }
+body.can-rotate #fullscreenBtn { display: inline-block; }
+/* The note in the corner needs room beside the turn buttons. */
+@media (max-width: 980px) {
+  .credits { display: none; }
+}
+@media (max-height: 760px) {
+  .hint { display: none; }
+}

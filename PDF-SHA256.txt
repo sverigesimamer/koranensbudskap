@@ -1,0 +1,2 @@
+Alla 30 filer i public/quran är kopior av originalen i sakina/PDF (JUZn SWEDEN.pdf -> JUZn-SWEDEN.pdf).
+JUZ1 SHA-256: 959a9b1d09da1b5eca5d6ef0e7b6db84dab9dacd7637b571b66321c994e92e7e

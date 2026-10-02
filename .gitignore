@@ -1,0 +1,9 @@
+# The PDF files are far too large for Git and for Cloudflare Pages (see src/config.js).
+public/quran/*.pdf
+
+# Screen recording used as a visual reference while building.
+reference/
+
+node_modules/
+.DS_Store
+Thumbs.db

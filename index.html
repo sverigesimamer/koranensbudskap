@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Koranens Budskap</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand">Koranens Budskap</div>
+      <button id="navBtn" class="ghost-pill nav-btn" type="button" aria-haspopup="dialog" aria-expanded="false">Navigera i Koranen</button>
+      <div class="top-actions">
+        <button id="pageInfo" class="ghost-pill" type="button">Sidor</button>
+        <button id="fullscreenBtn" class="icon-btn" type="button" aria-label="Helskärm, två sidor" title="Helskärm – två sidor i liggande läge">⛶</button>
+        <button id="settingsBtn" class="icon-btn" type="button" aria-label="Inställningar">⚙</button>
+      </div>
+    </header>
+
+    <section id="stage" class="stage" aria-label="Koranens Budskap, bokuppslag">
+      <div id="book" class="book" role="application" aria-label="Koranens Budskap, uppslag">
+        <div class="book-shadow" aria-hidden="true"></div>
+        <div class="cover" aria-hidden="true"></div>
+        <div class="stack stack-left" aria-hidden="true"></div>
+        <div class="stack stack-right" aria-hidden="true"></div>
+        <div class="endpaper" aria-hidden="true"></div>
+
+        <!-- Each page: the untouched PDF.js canvas, then the interaction
+             layers on top of it. The canvas is inserted by book-view.js. -->
+        <article class="page page-left is-empty" aria-label="Vänster sida">
+          <div class="highlight-layer"></div>
+          <div class="hotspot-layer"></div>
+          <div class="page-shade" aria-hidden="true"></div>
+        </article>
+
+        <article class="page page-right is-empty" aria-label="Höger sida">
+          <div class="highlight-layer"></div>
+          <div class="hotspot-layer"></div>
+          <div class="page-shade" aria-hidden="true"></div>
+        </article>
+
+        <div id="loading" class="loading" role="status">Läser in boken…</div>
+      </div>
+
+      <div class="hint">Dra i en sidkant för att bläddra · dubbelklicka på en sida för att zooma · ← nästa · → föregående</div>
+
+      <!-- Reading zoom: an invisible scroller. The book itself is scaled and
+           panned to stay under .zoom-page, which only carries the hotspots. -->
+      <div id="zoomView" class="zoom-view" hidden>
+        <div class="zoom-scroll" tabindex="-1">
+          <div class="zoom-page">
+            <div class="hotspot-layer"></div>
+          </div>
+        </div>
+        <button id="zoomClose" class="zoom-close" type="button">Visa uppslag</button>
+      </div>
+    </section>
+
+    <footer class="footerbar">
+      <div class="credits">Original-PDF renderas oredigerad</div>
+      <!-- Right-to-left book: the left button moves on, the right one goes back. -->
+      <button id="nextBtn" class="turn-btn" type="button" aria-label="Nästa uppslag" title="Nästa uppslag (←)">‹</button>
+      <div id="player" class="player-pill" role="group" aria-label="Uppläsning">
+        <button id="playerPrev" class="player-step" type="button" aria-label="Föregående vers" title="Föregående vers">⏮</button>
+        <button id="playerToggle" class="play-dot" type="button" aria-label="Spela upp">▶</button>
+        <button id="playerNext" class="player-step" type="button" aria-label="Nästa vers" title="Nästa vers">⏭</button>
+        <span class="player-text">
+          <strong id="playerTitle">Lyssna från den här sidan</strong>
+          <small id="playerSub"></small>
+        </span>
+      </div>
+      <button id="prevBtn" class="turn-btn" type="button" aria-label="Föregående uppslag" title="Föregående uppslag (→)">›</button>
+    </footer>
+  </main>
+
+  <!-- The turning sheet is drawn here, above the book. -->
+  <canvas id="flipCanvas" class="flip-canvas" aria-hidden="true"></canvas>
+
+  <aside id="settingsPanel" class="settings-panel" aria-hidden="true">
+    <div class="settings-head">
+      <strong>Visning</strong>
+      <button id="closeSettings" class="xbtn" type="button" aria-label="Stäng">×</button>
+    </div>
+    <label class="setting-row">
+      <span>
+        <b>Nattläge</b>
+        <small>Mörkare omgivning – PDF:n ändras inte</small>
+      </span>
+      <input id="nightToggle" type="checkbox" />
+    </label>
+    <label class="setting-row">
+      <span>
+        <b>Hotspot-debug</b>
+        <small>Visar klicklagret när verser är mappade</small>
+      </span>
+      <input id="hotspotToggle" type="checkbox" />
+    </label>
+    <label class="setting-row">
+      <span><b>Gå till juz</b><small>Öppnar första uppslaget i delen</small></span>
+      <select id="juzSelect"></select>
+    </label>
+    <div class="setting-row stacked">
+      <span><b>Gå till sida</b><small>Sidnumret som står tryckt på sidan</small></span>
+      <input id="pageJump" type="number" min="1" step="1" value="1" />
+      <button id="jumpBtn" type="button">Öppna</button>
+    </div>
+  </aside>
+
+  <!-- Only on screen while open (opened with the "Navigera i Koranen" button). -->
+  <div id="navPanel" class="nav-panel" role="dialog" aria-label="Navigera i Koranen" hidden>
+    <div class="nav-head">
+      <div class="nav-tabs" role="tablist">
+        <button type="button" role="tab" data-tab="surah">Sura</button>
+        <button type="button" role="tab" data-tab="verse">Vers</button>
+        <button type="button" role="tab" data-tab="juz">Juz</button>
+        <button type="button" role="tab" data-tab="page">Sida</button>
+      </div>
+      <button type="button" class="xbtn nav-close" aria-label="Stäng">×</button>
+    </div>
+    <div class="nav-body"></div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
