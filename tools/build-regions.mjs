@@ -169,6 +169,11 @@ function arabicLayout(shapes) {
       right = 2 * centre - left;
     }
   }
+  if (!special && marks.length) {
+    // Where most lines end with a rosette (the short verses of the last juz)
+    // the text itself rarely reaches the frame; the rosettes do.
+    left = Math.min(left, ...marks.map((mk) => (mk.x0 + mk.x1) / 2 - ROSETTE_RADIUS));
+  }
   for (const s of ink) {
     const line = perLine[lineOf(s.y)];
     if (!line || s.x1 < left - 6 || s.x0 > right + 6) continue;

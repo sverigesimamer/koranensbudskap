@@ -7,16 +7,12 @@ const pagesInJuz = (juz) => (juz === 1 ? 22 : juz === 30 ? 24 : 20);
 
 // Where the 30 PDF files are fetched from.
 //
-// On your own machine (start.cmd / node serve.mjs) they are read from
-// public/quran/. They are not in the Git repository: each is 55–115 MB, more
-// than Cloudflare Pages serves (25 MB per file) and, for five of them, more
-// than GitHub accepts (100 MB). For the published site, put the 30 files in a
-// public bucket (Cloudflare R2, say) that allows cross-origin requests and
-// byte ranges, and give its address here, ending with a slash:
-//   const PDF_HOST = 'https://pdf.example.com/';
-const PDF_HOST = '';
-const isLocal = /^(localhost|127.0.0.1|[::1])$/.test(globalThis.location?.hostname ?? 'localhost');
-const pdfBase = PDF_HOST && !isLocal ? PDF_HOST : './public/quran/';
+// public/quran-web/ holds the web copies: the originals (public/quran/, 55–115
+// MB each, not in the Git repository) repacked by tools/slim-pdf.mjs so that
+// every file fits what Cloudflare Pages serves (25 MB per file). To show the
+// originals instead, say './public/quran/' here; to fetch the files from
+// somewhere else, give that address, ending with a slash.
+const pdfBase = './public/quran-web/';
 
 export const CONFIG = {
   // The PDF files, in reading order. They are shown as one book.

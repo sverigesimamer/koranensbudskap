@@ -27,7 +27,7 @@ async function start() {
     console.error(err);
     $('#loading').textContent = /^(localhost|127.0.0.1)$/.test(location.hostname)
       ? 'Kunde inte läsa PDF:en. Starta via start.cmd / node serve.mjs.'
-      : 'PDF-filerna kunde inte hämtas. Ange var de ligger (PDF_HOST) i src/config.js.';
+      : 'PDF-filerna kunde inte hämtas.';
     return;
   }
 

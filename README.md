@@ -1,7 +1,8 @@
-# Quran Book V1
+# Koranens Budskap
 
-Fristående Quran-webbapp. Original-PDF:en (`public/quran/JUZ1-SWEDEN.pdf`) renderas
-oredigerad med PDF.js och presenteras som en fysisk bok med riktig sidvändning.
+Fristående webbapp som visar Koranen (30 PDF-filer, en per juz) som en fysisk bok
+med riktig sidvändning. Sidorna ritas av PDF.js direkt ur PDF-filerna – inget är
+omritat eller ersatt med HTML-text.
 
 ## Starta
 
@@ -17,14 +18,42 @@ servern – inte genom att dubbelklicka på `index.html`.
 
 ## Publicera (GitHub → Cloudflare Pages)
 
-Sajten är helt statisk: inget byggsteg, utdatamappen är projektets rot.
+Sajten är helt statisk: inget byggsteg, utdatamappen är projektets rot. Allt som
+behövs ligger i Git-repot, även PDF-filerna (webbkopiorna, se nedan).
 
-PDF-filerna ligger **inte** i Git-repot (`.gitignore`). De är 55–115 MB styck;
-Cloudflare Pages tar högst 25 MB per fil och GitHub högst 100 MB. Lägg de 30
-filerna (`JUZ1-SWEDEN.pdf` … `JUZ30-SWEDEN.pdf`) i en publik lagringsyta, till
-exempel Cloudflare R2, som tillåter anrop från sajtens adress (CORS) och
-delhämtning (Range), och skriv dess adress i `PDF_HOST` överst i
-`src/config.js`. Lokalt (`localhost`) läses filerna alltid från `public/quran/`.
+## PDF-filerna: original och webbkopior
+
+| Mapp | Innehåll | I Git |
+| --- | --- | --- |
+| `public/quran/` | Originalen från tryckeriet, 55–115 MB per juz (2,2 GB) | nej |
+| `public/quran-web/` | Webbkopiorna som appen visar, 233 MB totalt, största filen 22,5 MB | ja |
+
+Originalen är för stora för webben (Cloudflare Pages tar högst 25 MB per fil,
+GitHub högst 100 MB). De är stora av ett enda skäl: InDesign har lagt in hela den
+arabiska sidan en gång per textrad, beskuren till raden, så varje ordkontur står
+utskriven ungefär femton gånger per sida.
+
+`tools/slim-pdf.mjs` skriver en kopia där varje sådan följd av konturer lagras en
+gång och ritas på de ställen där den stod:
+
+```bash
+node tools/slim-pdf.mjs --all
+```
+
+- Originalen läses bara, de ändras aldrig.
+- Inget rastreras, ritas om eller flyttas. Text, typsnitt, färger och allt annat
+  kopieras byte för byte; sidorna är fortfarande vektorgrafik och lika skarpa i zoom.
+- Kopian är inte bit-exakt: två kopior av samma kontur skiljer sig i sista
+  siffran InDesign skrev (0,001 punkt = 0,0004 mm), och webbkopian använder den
+  första för alla. Det är mindre än vad webbläsarens egen kantutjämning varierar
+  när samma sida ritas en tvåtusendels pixel förskjuten.
+- Efter skrivningen läser verktyget tillbaka kopian, skriver ut de lagrade
+  konturerna där de används och jämför med originalets sidbeskrivning ord för
+  ord. Största skillnaden skrivs ut; en fil som avviker mer än 0,0025 punkt
+  eller på något annat sätt underkänns.
+
+För att visa originalen i stället: sätt `pdfBase` i `src/config.js` till
+`./public/quran/`.
 
 ## Bläddra
 
@@ -51,12 +80,12 @@ titelringen rättvänd. Bild och beskärning ställs in under `cover` i
 
 ## Innehåll: 30 juz som en bok
 
-De 30 filerna `public/quran/JUZ1-SWEDEN.pdf` … `JUZ30-SWEDEN.pdf` (oredigerade
-kopior) visas som en sammanhängande bok: 606 PDF-sidor mellan pärmarna. Listan
-finns i `volumes` i `src/config.js`. En fil öppnas först när någon av dess sidor
-behövs, bara de delar som sidorna använder hämtas, och högst fyra filer hålls
-öppna samtidigt. Under inställningar (⚙) finns "Gå till juz" och "Gå till sida"
-(det tryckta sidnumret).
+De 30 filerna `JUZ1-SWEDEN.pdf` … `JUZ30-SWEDEN.pdf` visas som en
+sammanhängande bok: 606 PDF-sidor mellan pärmarna. Listan finns i `volumes` i
+`src/config.js`. En fil öppnas först när någon av dess sidor behövs, bara de
+delar som sidorna använder hämtas, och högst fyra filer hålls öppna samtidigt.
+Under inställningar (⚙) finns "Gå till juz" och "Gå till sida" (det tryckta
+sidnumret).
 
 ## Navigera i Koranen
 
@@ -126,7 +155,8 @@ och inget målas över: de åtta linjerna ritas helt enkelt aldrig
 index.html              sidans DOM: två .page med canvas + lager, plus overlay-canvas
 styles.css              skrivbord, bok, pärm, sidbunt, UI
 serve.mjs / start.cmd   lokal server (stöd för HTTP Range så PDF.js kan strömma PDF:en)
-data/page-meta.js       sidmetadata och (ännu tomma) versregioner
+data/                   vilken vers som står var (quran-data.js) och versytor (regions/)
+tools/                  build-regions.mjs (versytor), slim-pdf.mjs (webbkopior av PDF:erna)
 src/
   config.js             alla inställningar: sidordning, ljus, böjning, fjädrar
   main.js               startar appen, tangentbord, inställningspanel
@@ -209,17 +239,13 @@ koordinater (0–1 av PDF-sidan):
   Nyckeln `surah:ayah` är samma som QUL/Tarteel använder, så ljud och sök kan
   kopplas dit utan att röra bok- eller PDF-koden.
 
-Ljud och sök är inte implementerade.
-
 ## Begränsningar
 
 - Sidvändningen kräver WebGL2. Saknas det byts uppslag utan animation.
-- Mobil visar fortfarande två sidor (nedskalat). En-sida-läge är inte byggt.
 - Bladet har parallella böjlinjer (cylindrisk böjning). Det ger hörnlyft och
   mjuk kurva men inte dubbelkrökta former som ett riktigt papper kan få.
-- PDF:en är tung (ca 100 MB). Första uppslaget tar några sekunder; närliggande
+- Sidorna är tung vektorgrafik. Första uppslaget tar någon sekund; närliggande
   uppslag förrenderas i bakgrunden. Bläddrar man fortare än så går nästa blad inte att
   lyfta förrän dess sidor är klara.
-- PDF-sidorna visas helt obeskurna, så PDF:ens skärmärken i hörnen syns.
 - Medan bladet är i luften visas det via WebGL och kan vara marginellt mjukare
   än den vilande sidan.
