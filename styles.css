@@ -35,9 +35,20 @@ body {
     linear-gradient(90deg, var(--wood-3), var(--wood-2) 22%, var(--wood-1) 48%, #8b4b28 74%, #5d301b);
   transition: filter .35s ease;
 }
-/* Night mode only dims the presentation around and over the page. */
-body.night .app-shell,
-body.night .flip-canvas { filter: brightness(.62) saturate(.9); }
+/* Night mode, like Night Shift: no darkening, just warmer light. A layer over
+   the whole screen multiplies every colour with a warm tone, which takes the
+   blue out of white paper and leaves it cream. --warmth (0–1) is set from the
+   slider in the settings. Nothing is drawn differently underneath. */
+.night-shift {
+  --warmth: .55;
+  position: fixed; inset: 0; z-index: 1000;
+  pointer-events: none;
+  background: rgb(255, calc(255 - 54 * var(--warmth)), calc(255 - 122 * var(--warmth)));
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity .8s ease;
+}
+body.night .night-shift { opacity: 1; }
 
 .topbar, .footerbar {
   display: flex; align-items: center; justify-content: space-between;
@@ -330,6 +341,32 @@ body.night .flip-canvas { filter: brightness(.62) saturate(.9); }
 .setting-row select { background: #111; color: #fff; border: 1px solid #555; border-radius: 8px; padding: 8px; font: inherit; font-size: 12px; }
 .setting-row input[type="number"] { width: 72px; background: #111; color: #fff; border: 1px solid #555; border-radius: 8px; padding: 8px; }
 #jumpBtn { padding: 8px 10px; border-radius: 8px; }
+.setting-row[hidden] { display: none; }
+
+/* On/off settings are switches, as on the iPhone. */
+.switch {
+  appearance: none; -webkit-appearance: none; margin: 0; flex: none;
+  position: relative; width: 46px; height: 28px; border-radius: 14px;
+  background: rgba(255, 255, 255, .22); cursor: pointer;
+  transition: background .25s ease;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 24px; height: 24px; border-radius: 50%; background: #fff;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, .3), 0 0 1px rgba(0, 0, 0, .2);
+  transition: transform .25s cubic-bezier(.3, .7, .4, 1.15);
+}
+.switch:checked { background: #34c759; }
+.switch:checked::after { transform: translateX(18px); }
+.switch:focus-visible { outline: 2px solid rgba(255, 255, 255, .7); outline-offset: 2px; }
+
+.warmth-row { padding-top: 4px; border-top: none; }
+.warmth-scale { display: flex; align-items: center; gap: 8px; flex: 1; max-width: 230px; }
+.warmth-scale small { margin: 0; }
+.warmth-scale input {
+  flex: 1; accent-color: #f0a640;
+  background: transparent;
+}
 
 /* ---------- "Navigera i Koranen" ---------- */
 .nav-btn { position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap; }

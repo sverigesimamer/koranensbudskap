@@ -392,7 +392,26 @@ async function start() {
   };
   $('#settingsBtn').addEventListener('click', () => setPanel(!panel.classList.contains('open')));
   $('#closeSettings').addEventListener('click', () => setPanel(false));
-  $('#nightToggle').addEventListener('change', (e) => document.body.classList.toggle('night', e.target.checked));
+  // Night mode (warm light, like Night Shift); remembered in this browser.
+  const remember = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
+  const recall = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
+  const nightToggle = $('#nightToggle');
+  const warmth = $('#warmth');
+  const setNight = (on) => {
+    document.body.classList.toggle('night', on);
+    $('#warmthRow').hidden = !on;
+    remember('kb-night', on ? '1' : '0');
+  };
+  const setWarmth = (value) => {
+    $('#nightShift').style.setProperty('--warmth', value);
+    remember('kb-warmth', value);
+  };
+  if (recall('kb-warmth')) warmth.value = recall('kb-warmth');
+  setWarmth(warmth.value);
+  nightToggle.checked = recall('kb-night') === '1';
+  setNight(nightToggle.checked);
+  nightToggle.addEventListener('change', () => setNight(nightToggle.checked));
+  warmth.addEventListener('input', () => setWarmth(warmth.value));
   $('#hotspotToggle').addEventListener('change', (e) => {
     view.debugHotspots = e.target.checked;
     view.refreshLayers();
