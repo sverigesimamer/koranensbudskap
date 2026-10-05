@@ -390,8 +390,9 @@ export class FlipController {
    * waiting (see #step), so quick clicking pages through quickly.
    * @param {'next'|'prev'} dir
    * @param {boolean} [queued] internal: this turn comes out of the queue
+   * @param {number} [speed] below 1 for a slower, more deliberate turn
    */
-  async turn(dir, queued = false) {
+  async turn(dir, queued = false, speed) {
     if (!this.enabled) return;
     this.#skipTail();
     if (this.busy || this.starting) {
@@ -425,6 +426,7 @@ export class FlipController {
     this.#startAuto(this.session);
     // The last of a quick series still moves a little faster than a single turn.
     if (queued) this.session.speed = CONFIG.flip.queuedSpeed;
+    else if (speed) this.session.speed = speed;
   }
 
   // ---- pointer input ----------------------------------------------------
