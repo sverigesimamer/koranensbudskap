@@ -288,10 +288,20 @@ async function start() {
     zoom.close();
   });
 
-  // The closed book opens on a click anywhere on its cover.
+  // The closed book opens on a click anywhere on its cover. The front cover
+  // swings open straight onto Al-Fatihah, past the title page.
+  const openOnFatiha = () => {
+    const fatiha = source.bookPageOf(QuranIndex.pageOfVerse(1, 1));
+    pendingFocus = fatiha;
+    if (!flip || !flip.jumpTo(model.spreadOfPage(fatiha))) {
+      goToSpread(model.spreadOfPage(fatiha)).then(() => { view.focusPage(fatiha, false); pendingFocus = null; });
+    }
+  };
+  if (flip) flip.onOpenCover = openOnFatiha;
   $('#book').addEventListener('click', (e) => {
     if (!view.isClosed || flip?.busy || !e.target.closest('.page.is-cover')) return;
-    turn(view.closedSide === 'front' ? 'next' : 'prev');
+    if (view.closedSide === 'front') openOnFatiha();
+    else turn('prev');
   });
   $('#zoomClose').addEventListener('click', (e) => {
     e.stopPropagation();

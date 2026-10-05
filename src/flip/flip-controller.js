@@ -510,6 +510,10 @@ export class FlipController {
       const onHotspot = s.down.target instanceof Element && s.down.target.closest('.hotspot');
       if (onHotspot) {
         this.#release(s, false);
+      } else if (this.onOpenCover && this.view.closedSide === 'front' && s.turn.dir === 'next') {
+        // A click on the closed front cover: the app decides where it opens.
+        this.#end(false, true);
+        this.onOpenCover();
       } else {
         this.#startAuto(s);
       }
