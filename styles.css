@@ -144,34 +144,63 @@ body.night .night-shift { opacity: 1; }
    outside the page area, so the PDF canvas is never covered or cropped. */
 .stack {
   position: absolute; top: 1px;
-  height: calc(100% + 3px + (var(--board-y) + var(--closed-drop) - 3px) * var(--closed));
-  width: calc(50% + 2px);
-  background: linear-gradient(180deg, #efe9d8 calc(100% - 4px), #cfc5ac);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  /* --edge: how much of the block's lower edge shows below the page; it
+     grows with the number of leaves on that side. */
+  height: calc(100% - 1px + var(--edge) + (var(--board-y) + var(--closed-drop) - var(--edge)) * var(--closed));
+  /* Reaches from its fore-edge to the spine, where the two blocks meet. */
+  width: calc(50% + var(--stack-side));
+  /* Only under the page; the lower edge below it is ::after. */
+  background: linear-gradient(#efe9d8, #efe9d8) top / 100% calc(var(--page-h, 420px) - 1px) no-repeat;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .3));
 }
-/* Fore-edge: the individual leaves seen from the side. */
+.stack-left { --stack-side: var(--stack-left); --edge: calc(var(--stack-left) * .55 + 1.5px); }
+.stack-right { --stack-side: var(--stack-right); --edge: calc(var(--stack-right) * .55 + 1.5px); }
+/* Fore-edge: the individual leaves seen from the side, a little darker
+   towards the bottom where the light reaches less. */
 .stack::before {
-  content: ""; position: absolute; top: 0; bottom: 3px;
+  content: ""; position: absolute; top: 0; bottom: 0;
+  background:
+    repeating-linear-gradient(var(--leaf-dir), rgba(125, 104, 72, .38) 0 .7px, transparent .7px 1.7px),
+    linear-gradient(180deg, #f3eedf, #e6ddc6 85%, #d6caae);
+}
+/* Lower edge of the block: the same leaves seen from below the page. The
+   leaves bend down into the gutter, so the edge thins out towards the spine
+   (not on a closed book, which lies flat). */
+.stack::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0;
+  top: calc(var(--page-h, 420px) - 2px);
+  background:
+    repeating-linear-gradient(180deg, rgba(125, 104, 72, .34) 0 .6px, transparent .6px 1.6px),
+    linear-gradient(180deg, #ece4cf, #d9cdb0 70%, #c7b998);
 }
 .stack-left {
+  --leaf-dir: 90deg;
   opacity: var(--left-open);
   left: calc(var(--stack-left) * -1);
-  border-radius: 3px 0 0 4px;
+  border-radius: 3px 0 0 5px;
   transition: left .4s ease;
 }
-.stack-left::before {
-  left: 0; width: var(--stack-left);
-  background: repeating-linear-gradient(90deg, rgba(120, 100, 70, .45) 0 1px, transparent 1px 2.5px);
+.stack-left::before { left: 0; width: var(--stack-left); border-radius: 3px 0 0 5px; }
+.stack-left::after {
+  border-radius: 0 0 0 5px;
+  /* Full thickness over most of the width, curving away to nothing at the spine. */
+  clip-path: polygon(0 0, 100% 0,
+    100% calc(100% * var(--closed)), 97% calc(30% + 70% * var(--closed)), 92% calc(58% + 42% * var(--closed)),
+    85% calc(78% + 22% * var(--closed)), 75% calc(92% + 8% * var(--closed)), 62% 100%, 0 100%);
 }
 .stack-right {
+  --leaf-dir: 270deg;
   opacity: var(--right-open);
   right: calc(var(--stack-right) * -1);
-  border-radius: 0 3px 4px 0;
+  border-radius: 0 3px 5px 0;
   transition: right .4s ease;
 }
-.stack-right::before {
-  right: 0; width: var(--stack-right);
-  background: repeating-linear-gradient(270deg, rgba(120, 100, 70, .45) 0 1px, transparent 1px 2.5px);
+.stack-right::before { right: 0; width: var(--stack-right); border-radius: 0 3px 5px 0; }
+.stack-right::after {
+  border-radius: 0 0 5px 0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 38% 100%,
+    25% calc(92% + 8% * var(--closed)), 15% calc(78% + 22% * var(--closed)), 8% calc(58% + 42% * var(--closed)),
+    3% calc(30% + 70% * var(--closed)), 0 calc(100% * var(--closed)));
 }
 
 /* Inside of the cover, visible where there is no page. */

@@ -167,7 +167,11 @@ void main() {
   }
 
   // Lighting changes as the sheet bends; a flat page is exactly neutral.
+  // Where the sheet is still close to the page it lies on — the bend at the
+  // spine as the sheet lands — it is lit like that page, or the narrow,
+  // steep strip there shows as a dark line.
   float shade = 1.0 + uDiffuse * (dot(Nf, uLight) - uLight.z) - uCurve * (1.0 - abs(N.z));
+  shade = 1.0 + (shade - 1.0) * smoothstep(0.0, uLift, vWorld.z);
   if (shade > 1.0) {
     col = mix(col, vec3(1.0), min((shade - 1.0) * 1.6, 0.35));
   } else {
