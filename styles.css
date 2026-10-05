@@ -265,9 +265,14 @@ body.night .night-shift { opacity: 1; }
 .page-shade { z-index: 4; pointer-events: none; }
 .book.is-turning .hotspot { pointer-events: none; }
 
+/* Until the first page is ready the book stays out of sight (it has no
+   size or place yet); then it fades in where it belongs. */
+body:not(.ready) .book { opacity: 0; }
+.book { transition: opacity .6s ease; }
 .loading {
   position: absolute; inset: 0; display: grid; place-items: center;
-  font-size: 13px; color: #5b4a33; z-index: 6;
+  font-size: 13px; letter-spacing: .3px; color: rgba(255, 240, 220, .75); z-index: 6;
+  pointer-events: none;
 }
 .loading[hidden] { display: none; }
 

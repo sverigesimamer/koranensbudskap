@@ -208,10 +208,12 @@ export class FlipController {
    * at once, more of them the further away the target is, and for as long as
    * its pages are still being rendered — and a last sheet turns over and
    * settles softly on the target spread.
+   * @param {{speed?: number}} [options] speed: tempo of the last sheet (or of
+   *   the cover, out of the closed book) instead of the hurried default
    * @returns {boolean} false if the jump cannot be animated (the caller
    *   should then just show the spread)
    */
-  jumpTo(target) {
+  jumpTo(target, options = {}) {
     const view = this.view;
     if (!this.enabled || !view.model.hasSpread(target)) return false;
     this.queue.length = 0;
@@ -239,7 +241,8 @@ export class FlipController {
       min: fan ? riffleCounts[distance <= riffleNear ? 0 : distance <= riffleFar ? 1 : 2] : 0,
       nextSpawn: now,
       ready: !!view.prepareJump(target),
-      finalStarted: false
+      finalStarted: false,
+      speed: options.speed
     };
     this.jump = jump;
     view.source.hold(true);
@@ -295,7 +298,7 @@ export class FlipController {
       const { jumpMaxMs, jumpLandSpeed, jumpLandSpeedMax, autoDuration } = CONFIG.flip;
       const left = jump.started + jumpMaxMs - now;
       const unhurried = autoDuration + 560; // a turn plus its soft landing, at speed 1
-      s.speed = clamp(unhurried / Math.max(left, 1), jumpLandSpeed, jumpLandSpeedMax);
+      s.speed = jump.speed || clamp(unhurried / Math.max(left, 1), jumpLandSpeed, jumpLandSpeedMax);
       return;
     }
 
@@ -390,9 +393,8 @@ export class FlipController {
    * waiting (see #step), so quick clicking pages through quickly.
    * @param {'next'|'prev'} dir
    * @param {boolean} [queued] internal: this turn comes out of the queue
-   * @param {number} [speed] below 1 for a slower, more deliberate turn
    */
-  async turn(dir, queued = false, speed) {
+  async turn(dir, queued = false) {
     if (!this.enabled) return;
     this.#skipTail();
     if (this.busy || this.starting) {
@@ -426,7 +428,6 @@ export class FlipController {
     this.#startAuto(this.session);
     // The last of a quick series still moves a little faster than a single turn.
     if (queued) this.session.speed = CONFIG.flip.queuedSpeed;
-    else if (speed) this.session.speed = speed;
   }
 
   // ---- pointer input ----------------------------------------------------

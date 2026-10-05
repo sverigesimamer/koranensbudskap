@@ -97,11 +97,10 @@ export const CONFIG = {
 
     // The closed book stays a moment, then opens by itself on Al-Fatihah
     // (milliseconds after the cover is shown; 0 = wait for a click).
-    autoOpenMs: 1400,
-    // How it opens: the cover swings up (speed 1 = as a click turns it),
-    // the title page shows for pauseMs, then the leaf turns slowly onto
-    // Al-Fatihah (speed 0.5 = twice as long as a normal turn).
-    opening: { coverSpeed: 0.8, pauseMs: 2000, leafSpeed: 0.45 },
+    autoOpenMs: 2000,
+    // Tempo of the opening cover: 1 = as fast as a page turned by a click,
+    // 0.5 = twice as long.
+    openingSpeed: 0.5,
 
     // The number printed on a page = its page number in the PDF files + this
     // (the first PDF page is unnumbered, so the page printed "1" is PDF page 2).

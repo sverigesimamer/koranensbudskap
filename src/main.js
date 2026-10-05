@@ -138,6 +138,7 @@ async function start() {
   view.layout();
   await goToSpread(model.spreadOfPage(CONFIG.book.startPage));
   $('#loading').hidden = true;
+  document.body.classList.add('ready');
   showToast(`${source.volumes.length} juz · ${source.pageCount} sidor`);
 
   // ---- input ----
@@ -289,33 +290,14 @@ async function start() {
   });
 
   // The closed book opens on a click anywhere on its cover. The front cover
-  // swings open onto the title page; a moment later the leaf turns over,
-  // slowly, onto Al-Fatihah.
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const settled = async () => { while (flip.busy || flip.starting) await sleep(50); };
-  let opening = false;
-  const openOnFatiha = async () => {
+  // swings up slowly and comes down straight onto Al-Fatihah, past the
+  // title page.
+  const openOnFatiha = () => {
     const fatiha = source.bookPageOf(QuranIndex.pageOfVerse(1, 1));
     const target = model.spreadOfPage(fatiha);
-    if (!flip) {
-      await goToSpread(target);
-      view.focusPage(fatiha, false);
-      return;
-    }
-    if (opening) return;
-    opening = true;
-    try {
-      const { coverSpeed, pauseMs, leafSpeed } = CONFIG.book.opening;
-      await flip.turn('next', false, coverSpeed);
-      await settled();
-      await sleep(pauseMs);
-      // Someone else has turned on, back or away meanwhile: leave it.
-      if (view.isClosed || view.index !== target - 1 || flip.busy) return;
-      pendingFocus = fatiha;
-      await flip.turn('next', false, leafSpeed);
-      await settled();
-    } finally {
-      opening = false;
+    pendingFocus = fatiha;
+    if (!flip || !flip.jumpTo(target, { speed: CONFIG.book.openingSpeed })) {
+      goToSpread(target).then(() => { view.focusPage(fatiha, false); pendingFocus = null; });
     }
   };
   if (flip) flip.onOpenCover = openOnFatiha;
