@@ -95,6 +95,10 @@ export const CONFIG = {
     // Book page shown at start. Page 1 is the cover: the book starts closed.
     startPage: 1,
 
+    // The closed book stays a moment, then opens by itself on Al-Fatihah
+    // (milliseconds after the cover is shown; 0 = wait for a click).
+    autoOpenMs: 1400,
+
     // The number printed on a page = its page number in the PDF files + this
     // (the first PDF page is unnumbered, so the page printed "1" is PDF page 2).
     printedPageOffset: -1,

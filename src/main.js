@@ -298,6 +298,12 @@ async function start() {
     }
   };
   if (flip) flip.onOpenCover = openOnFatiha;
+  // At start the closed book opens by itself, unless someone got there first.
+  if (CONFIG.book.autoOpenMs > 0) {
+    setTimeout(() => {
+      if (view.isClosed && view.closedSide === 'front' && !flip?.busy) openOnFatiha();
+    }, CONFIG.book.autoOpenMs);
+  }
   $('#book').addEventListener('click', (e) => {
     if (!view.isClosed || flip?.busy || !e.target.closest('.page.is-cover')) return;
     if (view.closedSide === 'front') openOnFatiha();
