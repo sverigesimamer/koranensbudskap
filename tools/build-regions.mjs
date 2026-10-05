@@ -48,6 +48,24 @@ const lastJuz = Number(process.argv[3] || 30);
 // --------------------------------------------------------------------------
 // Filled shapes of a page: fill colour and bounding box (PDF points, y up).
 // --------------------------------------------------------------------------
+/** [minX, minY, maxX, maxY] of a constructPath's points, or null. */
+function pathBox(ops, coords) {
+  if (!ops || !coords) return null;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const add = (x, y) => {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  };
+  let j = 0;
+  for (const op of ops) {
+    if (op === OPS.moveTo || op === OPS.lineTo) { add(coords[j], coords[j + 1]); j += 2; }
+    else if (op === OPS.curveTo) { for (let k = 0; k < 6; k += 2) add(coords[j + k], coords[j + k + 1]); j += 6; }
+    else if (op === OPS.curveTo2 || op === OPS.curveTo3) { add(coords[j], coords[j + 1]); add(coords[j + 2], coords[j + 3]); j += 4; }
+    else if (op === OPS.rectangle) { add(coords[j], coords[j + 1]); add(coords[j] + coords[j + 2], coords[j + 1] + coords[j + 3]); j += 4; }
+  }
+  return minX <= maxX ? [minX, minY, maxX, maxY] : null;
+}
+
 async function shapesOfPage(page) {
   const ops = await page.getOperatorList();
   const stack = [];
@@ -60,17 +78,28 @@ async function shapesOfPage(page) {
   ];
   const shapes = [];
   let pending = null;
+  // The clip region (as a box). The Arabic text is drawn once per line, each
+  // copy clipped to its line; only what the clip lets through is on the page.
+  let clip = [-Infinity, -Infinity, Infinity, Infinity];
+  let clipping = false;
   for (let i = 0; i < ops.fnArray.length; i++) {
     const fn = ops.fnArray[i];
     const args = ops.argsArray[i];
-    if (fn === OPS.save) stack.push([m, fill]);
-    else if (fn === OPS.restore) { if (stack.length) [m, fill] = stack.pop(); }
+    if (fn === OPS.save) stack.push([m, fill, clip]);
+    else if (fn === OPS.restore) { if (stack.length) [m, fill, clip] = stack.pop(); }
     else if (fn === OPS.transform) m = mul(m, args);
-    else if (fn === OPS.paintFormXObjectBegin) { stack.push([m, fill]); if (args && args[0]) m = mul(m, args[0]); }
-    else if (fn === OPS.paintFormXObjectEnd) { if (stack.length) [m, fill] = stack.pop(); }
+    else if (fn === OPS.paintFormXObjectBegin) { stack.push([m, fill, clip]); if (args && args[0]) m = mul(m, args[0]); }
+    else if (fn === OPS.paintFormXObjectEnd) { if (stack.length) [m, fill, clip] = stack.pop(); }
+    else if (fn === OPS.clip || fn === OPS.eoClip) clipping = true;
     else if (fn === OPS.setFillRGBColor) fill = `${args[0]},${args[1]},${args[2]}`;
     else if (fn === OPS.constructPath) {
-      const mm = args[2];
+      // The box PDF.js gives along can be far too small (a single point for
+      // an outline made of curves alone), so for the text take it from the
+      // path's own points (curve control points included: a little
+      // generous, never too small).
+      // (Only for the text: the rosette's position is taken, as it always
+      // was, from the box PDF.js gives.)
+      const mm = (fill === INK && pathBox(args[0], args[1])) || args[2];
       if (mm) {
         const xs = [m[0] * mm[0] + m[2] * mm[1] + m[4], m[0] * mm[2] + m[2] * mm[3] + m[4],
           m[0] * mm[0] + m[2] * mm[3] + m[4], m[0] * mm[2] + m[2] * mm[1] + m[4]];
@@ -81,10 +110,29 @@ async function shapesOfPage(page) {
     } else if (fn === OPS.fill || fn === OPS.eoFill || fn === OPS.fillStroke || fn === OPS.eoFillStroke) {
       // Rosettes, text — and large white panels (the text panel of the ornamental opening pages).
       const panel = fill === '255,255,255' && pending && pending[2] - pending[0] > 150 && pending[3] - pending[1] > 150;
-      if (pending && (fill === MARK || fill === INK || panel)) shapes.push({ fill, box: pending });
+      if (pending && (fill === MARK || fill === INK || panel)) {
+        const box = [Math.max(pending[0], clip[0]), Math.max(pending[1], clip[1]), Math.min(pending[2], clip[2]), Math.min(pending[3], clip[3])];
+        // (<=: now and then a rosette comes with a box of no size at all.)
+        if (box[0] <= box[2] && box[1] <= box[3]) {
+          // A white panel covers what was drawn before it (the ornament
+          // pattern under the text panel of the opening pages).
+          if (panel) {
+            for (let k = shapes.length - 1; k >= 0; k--) {
+              const b = shapes[k].box;
+              if (b[0] >= box[0] && b[2] <= box[2] && b[1] >= box[1] && b[3] <= box[3]) shapes.splice(k, 1);
+            }
+          }
+          shapes.push({ fill, box });
+        }
+      }
       pending = null;
+      clipping = false;
     } else if (fn === OPS.stroke || fn === OPS.endPath) {
+      if (clipping && pending) {
+        clip = [Math.max(pending[0], clip[0]), Math.max(pending[1], clip[1]), Math.min(pending[2], clip[2]), Math.min(pending[3], clip[3])];
+      }
       pending = null;
+      clipping = false;
     }
   }
   return shapes;
@@ -127,7 +175,24 @@ function arabicLayout(shapes) {
   }
 
   const lineOf = (y) => Math.round((top - y) / pitch);
-  const ink = shapes.filter((s) => s.fill === INK).map((s) => ({
+  // The opening pages have an ornament pattern of small squares in the text
+  // colour (hidden by the panel and the frame, but still in the drawing). A
+  // square that has identical neighbours at a fixed step on its row is
+  // pattern, not writing.
+  const isPattern = (s, all) => {
+    const [x0, y0, x1, y1] = s.box;
+    const w = x1 - x0;
+    const h = y1 - y0;
+    if (w < 5 || h < 5 || Math.abs(w - h) > 1) return false;
+    const twins = all.filter((o) => o !== s && Math.abs(o.box[1] - y0) < 0.3 &&
+      Math.abs((o.box[2] - o.box[0]) - w) < 0.2 && Math.abs((o.box[3] - o.box[1]) - h) < 0.2);
+    return twins.some((a) => twins.some((b) => a !== b &&
+      Math.abs((a.box[0] - x0) + (b.box[0] - x0)) < 0.3 && Math.abs(a.box[0] - x0) > w));
+  };
+  const inkShapes = shapes.filter((s) => s.fill === INK);
+  const squares = inkShapes.filter((s) => s.box[2] - s.box[0] >= 5 && s.box[3] - s.box[1] >= 5);
+  const pattern = new Set(squares.filter((s) => isPattern(s, squares)));
+  const ink = inkShapes.filter((s) => !pattern.has(s)).map((s) => ({
     x0: s.box[0], x1: s.box[2], y: (s.box[1] + s.box[3]) / 2
   })).filter((s) => {
     const i = (top - s.y) / pitch;
@@ -178,7 +243,7 @@ function arabicLayout(shapes) {
     const line = perLine[lineOf(s.y)];
     if (!line || s.x1 < left - 6 || s.x0 > right + 6) continue;
     line.inside = (line.inside || 0) + 1;
-    (line.boxes = line.boxes || []).push([s.x1, s.y]);
+    (line.boxes = line.boxes || []).push([s.x1, s.y, s.x0]);
     line.min = Math.min(line.min, s.x0);
     line.max = Math.max(line.max, s.x1);
   }
@@ -303,22 +368,21 @@ function orderColumns(columns, expected) {
   return { order: [...columns].sort((a, b) => height(b) - height(a)), exact: false };
 }
 
-/** Boxes of consecutive lines of one column, merged where the lines follow on. */
+/**
+ * One box per line, as wide as the line's words reach. Lines that follow on
+ * meet halfway between them, so the shade has no gaps and no overlaps.
+ */
 function lineRects(lines) {
-  const blocks = [];
+  const boxes = [];
   for (const line of lines) {
-    const y0 = line.y - line.size * 0.28;
-    const y1 = line.y + line.size * 0.9;
-    const last = blocks[blocks.length - 1];
-    if (last && last.column === line.column && last.y0 - y1 < line.size * 0.6 && last.y0 >= y0) {
-      last.y0 = y0;
-      last.x0 = Math.min(last.x0, line.x0);
-      last.x1 = Math.max(last.x1, line.x1);
-    } else {
-      blocks.push({ column: line.column, x0: line.x0, x1: line.x1, y0, y1 });
+    const box = { column: line.column, x0: line.x0, x1: line.x1, y0: line.y - line.size * 0.28, y1: line.y + line.size * 0.9 };
+    const last = boxes[boxes.length - 1];
+    if (last && last.column === line.column && last.y0 - box.y1 < line.size * 0.6 && last.y0 >= box.y0) {
+      last.y0 = box.y1 = (last.y0 + box.y1) / 2;
     }
+    boxes.push(box);
   }
-  return blocks.map((b) => toRect(b.x0 - 1.5, b.y0, b.x1 + 1.5, b.y1));
+  return boxes.map((b) => toRect(b.x0 - 1.5, b.y0, b.x1 + 1.5, b.y1));
 }
 
 // --------------------------------------------------------------------------
@@ -417,13 +481,34 @@ for (let juz = 1; juz <= lastJuz; juz++) {
         return toRect(x0 - 1, y - pitch * 0.46, x1 + 1, y + pitch * 0.46);
       };
       // Text between two places on the page; lines without text are skipped.
+      // How far the letters (and rosettes) between x0 and x1 on a line reach:
+      // the shade covers the writing, not the empty frame around it.
+      const inkBetween = (line, x0, x1, opensLine) => {
+        let lo = Infinity;
+        let hi = -Infinity;
+        for (const [bx1, , bx0] of layout.perLine[line].boxes || []) {
+          const c = (bx0 + bx1) / 2;
+          if (c < x0 || c > x1) continue;
+          lo = Math.min(lo, bx0);
+          hi = Math.max(hi, bx1);
+        }
+        for (const mk of layout.marks) {
+          const c = (mk.x0 + mk.x1) / 2;
+          // (A rosette that opens a line can stand right of the text frame.)
+          if (mk.line !== line || c < x0 || (!opensLine && c > x1)) continue;
+          lo = Math.min(lo, c - ROSETTE_RADIUS);
+          hi = Math.max(hi, c + ROSETTE_RADIUS);
+        }
+        return lo < hi ? [Math.max(lo, x0), hi] : null;
+      };
       const span = (from, to) => {
         const rects = [];
         for (let line = from.line; line <= to.line && line < lines; line++) {
           if (line < 0 || !occupied[line]) continue;
           const x1 = line === from.line ? from.x : right;
           const x0 = line === to.line ? to.x : left;
-          const rect = band(line, Math.max(x0, left - 4), Math.min(x1, right));
+          const ink = inkBetween(line, Math.max(x0, left - 4), Math.min(x1, right), x1 >= right);
+          const rect = ink && band(line, ink[0], ink[1]);
           if (rect) rects.push(rect);
         }
         return rects;
@@ -453,9 +538,12 @@ for (let juz = 1; juz <= lastJuz; juz++) {
         // Only shapes on the line's own height count: marks of the lines above
         // and below reach into this one.
         const lineY = top - mk.line * pitch;
+        // (Only what is visible counts, each shape once: a word can be as
+        // little as two or three shapes, e.g. "إنّ".)
         const leftOfRosette = (layout.perLine[mk.line].boxes || [])
-          .filter(([x1, y]) => x1 < rosetteLeft - 6 && Math.abs(y - lineY) < pitch * 0.3).length;
-        const more = leftOfRosette >= 6;
+          .filter(([x1, y, x0]) => x0 < rosetteLeft - 1 && x1 < rosetteLeft + 4 && Math.abs(y - lineY) < pitch * 0.3);
+        const reach = leftOfRosette.length ? rosetteLeft - Math.min(...leftOfRosette.map((b) => b[2])) : 0;
+        const more = leftOfRosette.length >= 2 && reach > 5;
         arabicVerse = verseAfter(arabicVerse);
         cursor = more ? { line: mk.line, x: rosetteLeft } : { line: mk.line + 1, x: right };
         if (arabicVerse && !layout.special) {
@@ -484,12 +572,7 @@ for (let juz = 1; juz <= lastJuz; juz++) {
         run = [];
       };
       order.forEach((column, c) => {
-        // Shade the full width of the column, not just as far as each line's
-        // last word reaches.
-        const colLeft = Math.min(...column.lines.map((l) => l.x0));
-        const colRight = Math.max(...column.lines.map((l) => l.x1));
-        for (const original of column.lines) {
-          const line = { ...original, x0: colLeft, x1: colRight };
+        for (const line of column.lines) {
           if (line.number !== null && next < expected.length && line.number === expected[next][1]) {
             flush();
             verse = expected[next++];
