@@ -139,7 +139,10 @@ export const CONFIG = {
   zoom: {
     maxWidth: 1280, // CSS px
     margin: 28,     // space left and right of the page
-    maxPixels: 14e6 // upper bound for the zoomed canvas
+    maxPixels: 14e6, // upper bound for the zoomed canvas
+    // During recitation the zoomed page scrolls along with the verse; after
+    // the reader scrolls by hand it waits this long before following again.
+    followPauseMs: 5000
   },
 
   flip: {

@@ -43,6 +43,36 @@ export class ZoomView {
     this.scrollEl.addEventListener('scroll', () => {
       if (this.state === 'open') this.#follow();
     });
+    // Scrolling by hand: the reader is looking somewhere else for a moment.
+    this.handScrolledAt = 0;
+    const byHand = () => { this.handScrolledAt = performance.now(); };
+    for (const type of ['wheel', 'touchmove', 'keydown', 'pointerdown']) {
+      this.scrollEl.addEventListener(type, byHand, { passive: true });
+    }
+  }
+
+  /**
+   * Bring a part of the zoomed page into view by scrolling smoothly — unless
+   * it is in view already, or the reader has just scrolled by hand.
+   * @param {[number, number, number, number][]} areas x, y, w, h (0..1 of the page)
+   * @returns {boolean} whether it is (or is being brought) into view
+   */
+  showAreas(areas) {
+    if (this.state !== 'open' || !areas.length) return false;
+    if (performance.now() - this.handScrolledAt < CONFIG.zoom.followPauseMs) return true;
+    const pageH = this.pageEl.getBoundingClientRect().height;
+    const top = Math.min(...areas.map((a) => a[1])) * pageH;
+    const bottom = Math.max(...areas.map((a) => a[1] + a[3])) * pageH;
+    const viewH = this.scrollEl.clientHeight;
+    const now = this.scrollEl.scrollTop;
+    // Comfortably in view: leave the page where it is.
+    if (top >= now + viewH * 0.12 && bottom <= now + viewH * 0.82) return true;
+    // Else: the verse about a third of the way down (its start, if it is
+    // taller than the view).
+    const want = bottom - top > viewH * 0.6 ? top - viewH * 0.12 : top - viewH * 0.32;
+    const max = this.scrollEl.scrollHeight - viewH;
+    this.scrollEl.scrollTo({ top: Math.max(0, Math.min(max, want)), behavior: 'smooth' });
+    return true;
   }
 
   get isOpen() {

@@ -335,6 +335,42 @@ async function start() {
   // somewhere else stops that until they come back to the verse being read
   // (see updateInfo).
 
+  // Zoomed in during recitation: the page scrolls along with the verse being
+  // read (its Arabic text), and on to the next page when the verse is there.
+  let zoomHop = null;
+  const arabicOf = (bookPage, surah, ayah) => {
+    const region = QuranIndex.regionsOnPage(pdfPage(bookPage)).find((r) => r.surah === surah && r.ayah === ayah);
+    return region ? region.arabic : [];
+  };
+  const followZoomed = (surah, ayah, versePage) => {
+    // The verse starts on this page, or carries over to it from the one before.
+    const here = arabicOf(zoom.page, surah, ayah);
+    if (zoom.page === versePage || here.length) {
+      zoom.showAreas(here.length ? here : arabicOf(versePage, surah, ayah));
+      return;
+    }
+    if (zoomHop) return;
+    // On another page: out of the zoom, over to that page, and in again.
+    const hop = zoomHop = { surah, ayah };
+    zoom.close();
+    setTimeout(async () => {
+      try {
+        const spread = model.spreadOfPage(versePage);
+        if (spread !== view.index) {
+          if (spread === view.index + 1 && flip) flip.turn('next');
+          else if (!flip || !flip.jumpTo(spread)) await goToSpread(spread);
+          while (flip && (flip.busy || flip.starting)) await new Promise((r) => setTimeout(r, 60));
+        }
+        if (!following || zoom.isOpen) return;
+        const side = view.slots.left.page === versePage ? 'left' : 'right';
+        const areas = arabicOf(versePage, hop.surah, hop.ayah);
+        zoom.open(side, areas.length ? areas[0][1] + areas[0][3] / 2 : 0);
+      } finally {
+        zoomHop = null;
+      }
+    }, 520);
+  };
+
   const player = new QuranPlayer({
     config: CONFIG.audio,
     surahCount: QuranIndex.surahs.length,
@@ -342,12 +378,16 @@ async function start() {
       view.highlighted = new Set([`${surah}:${ayah}`]);
       view.refreshLayers();
       const versePage = source.bookPageOf(QuranIndex.pageOfVerse(surah, ayah));
-      if (following && !verseShowing(surah, ayah) && !zoom.isOpen) {
+      if (following && zoom.isOpen) {
+        followZoomed(surah, ayah, versePage);
+        return;
+      }
+      if (following && !verseShowing(surah, ayah)) {
         const spread = model.spreadOfPage(versePage);
         pendingFocus = versePage;
         if (spread === view.index + 1 && flip) flip.turn('next');
         else if (!flip || !flip.jumpTo(spread)) goToSpread(spread).then(() => view.focusPage(versePage, false));
-      } else if (following && view.single && !zoom.isOpen) {
+      } else if (following && view.single) {
         // On the spread already, but perhaps on its other page.
         view.focusPage(versePage);
       }
