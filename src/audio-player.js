@@ -10,23 +10,31 @@
 // recited through `onVerse`, and its state through `onState`.
 
 const pad3 = (n) => String(n).padStart(3, '0');
-const fill = (template, surah) => template.replace('{surah3}', pad3(surah)).replace('{surah}', String(surah));
+const fill = (template, surah, reciter) => template
+  .replace('{surah3}', pad3(surah)).replace('{surah}', String(surah)).replace('{reciter}', String(reciter));
 
 /**
  * @typedef {{ayah: number, from: number, to: number, words: number[][]}} VerseTiming  times in seconds
- * @typedef {{status: 'idle'|'loading'|'playing'|'paused'|'error', surah: number|null, ayah: number|null, stored: boolean}} PlayerState
+ * @typedef {{status: 'idle'|'loading'|'playing'|'paused'|'error', surah: number|null, ayah: number|null, stored: boolean,
+ *   repeat: boolean, rate: number, reciter: import('./reciters.js').Reciter, error: 'missing'|'network'|null}} PlayerState
  */
+
+/** The reciter has no recording (or no timings) for a sura. */
+class MissingAudio extends Error {}
 
 export class QuranPlayer {
   /**
    * @param {Object} o
-   * @param {{surahUrl: string, timingsUrl: string, cacheName: string}} o.config
+   * @param {{timingsUrl: string, cacheName: string}} o.config
+   * @param {import('./reciters.js').Reciter} o.reciter
    * @param {number} o.surahCount
    * @param {(surah: number, ayah: number) => void} o.onVerse  a new verse is being recited
    * @param {(state: PlayerState) => void} o.onState
    */
-  constructor({ config, surahCount, onVerse, onState }) {
+  constructor({ config, reciter, surahCount, onVerse, onState }) {
     this.config = config;
+    this.reciter = reciter;
+    this.error = null;
     this.surahCount = surahCount;
     this.onVerse = onVerse;
     this.onState = onState;
@@ -39,6 +47,8 @@ export class QuranPlayer {
     this.timings = [];
     this.status = 'idle';
     this.stored = false;
+    /** Recite the current verse again and again instead of moving on. */
+    this.repeat = false;
     this.objectUrl = null;
     this.request = 0;
     this.ticker = 0;
@@ -54,7 +64,9 @@ export class QuranPlayer {
     });
     this.audio.addEventListener('ended', () => this.#surahEnded());
     this.audio.addEventListener('error', () => {
-      if (this.audio.src) this.#setStatus('error');
+      if (!this.audio.src) return;
+      this.error = 'network';
+      this.#setStatus('error');
     });
     this.audio.addEventListener('timeupdate', () => this.#track());
 
@@ -63,7 +75,69 @@ export class QuranPlayer {
   }
 
   get state() {
-    return { status: this.status, surah: this.surah, ayah: this.ayah, stored: this.stored };
+    return {
+      status: this.status, surah: this.surah, ayah: this.ayah, stored: this.stored,
+      repeat: this.repeat, rate: this.rate, reciter: this.reciter, error: this.error
+    };
+  }
+
+  /** Where in the sura's recording we are, and how long it is (seconds; 0 when unknown). */
+  get time() {
+    return this.audio.src ? this.audio.currentTime || 0 : 0;
+  }
+
+  get duration() {
+    const d = this.audio.duration;
+    return this.audio.src && Number.isFinite(d) ? d : 0;
+  }
+
+  /** Playback speed (1 = as recited). */
+  get rate() {
+    return this.audio.playbackRate || 1;
+  }
+
+  setRate(rate) {
+    this.audio.playbackRate = rate;
+    this.audio.defaultPlaybackRate = rate;
+    this.onState(this.state);
+  }
+
+  /**
+   * Another reciter. The verse stays: if the recitation was going on it
+   * goes on from the same verse in the new voice, else that verse is where
+   * play starts. The old recording is stopped first, so two voices are
+   * never heard together.
+   * @param {import('./reciters.js').Reciter} reciter
+   */
+  setReciter(reciter) {
+    if (!reciter || (this.reciter && reciter.id === this.reciter.id)) return;
+    const wasPlaying = this.isPlaying;
+    const { surah, ayah } = this;
+    this.reciter = reciter;
+    this.request++;
+    this.audio.pause();
+    this.audio.removeAttribute('src');
+    this.audio.load();
+    this.timings = [];
+    this.stored = false;
+    this.error = null;
+    if (surah && wasPlaying) {
+      this.play(surah, ayah || 1);
+    } else {
+      this.#setStatus(surah ? 'paused' : 'idle');
+    }
+  }
+
+  setRepeat(on) {
+    this.repeat = !!on;
+    this.onState(this.state);
+  }
+
+  /** Jump to a moment of the sura's recording; the verse follows. */
+  async seekTo(seconds) {
+    if (!this.surah || !this.audio.src) return;
+    await this.#seek(Math.max(0, Math.min(seconds, this.duration || seconds)));
+    this.#track(true);
   }
 
   #setStatus(status) {
@@ -103,7 +177,7 @@ export class QuranPlayer {
 
   /** @returns {Promise<VerseTiming[]>} */
   async #loadTimings(surah) {
-    const url = fill(this.config.timingsUrl, surah);
+    const url = fill(this.config.timingsUrl, surah, this.reciter.id);
     const store = await this.#store();
     let response = store ? await store.match(url) : null;
     if (!response) {
@@ -113,7 +187,10 @@ export class QuranPlayer {
     }
     const data = await response.json();
     const file = data.audio_files && data.audio_files[0];
-    if (!file) throw new Error('No timings for sura ' + surah);
+    if (!file || !file.audio_url || !(file.verse_timings || []).length) {
+      throw new MissingAudio(`${this.reciter.name}: nothing for sura ${surah}`);
+    }
+    this.fileUrl = file.audio_url;
     return file.verse_timings.map((t) => ({
       ayah: Number(t.verse_key.split(':')[1]),
       from: t.timestamp_from / 1000,
@@ -128,12 +205,12 @@ export class QuranPlayer {
     const request = ++this.request;
     this.#setStatus('loading');
     this.audio.pause();
-    const url = fill(this.config.surahUrl, surah);
     const store = await this.#store();
-    const [timings, stored] = await Promise.all([
-      this.#loadTimings(surah),
-      store ? store.match(url) : null
-    ]);
+    const timings = await this.#loadTimings(surah);
+    // The reciter's file: our own address for it, or the one the API gives
+    // with the timings (made for exactly that file).
+    const url = this.reciter.surahUrl ? fill(this.reciter.surahUrl, surah, this.reciter.id) : this.fileUrl;
+    const stored = store ? await store.match(url) : null;
     if (request !== this.request) return false;
 
     if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
@@ -162,6 +239,7 @@ export class QuranPlayer {
 
   /** Recite from this verse on. */
   async play(surah, ayah = 1) {
+    this.error = null;
     try {
       if (this.surah !== surah || !this.audio.src) {
         this.ayah = ayah;
@@ -178,6 +256,7 @@ export class QuranPlayer {
     } catch (err) {
       if (err && err.name === 'AbortError') return; // superseded by another play()
       console.error(err);
+      this.error = err instanceof MissingAudio ? 'missing' : 'network';
       this.#setStatus('error');
     }
   }
@@ -201,7 +280,13 @@ export class QuranPlayer {
   }
 
   resume() {
-    if (this.surah && this.audio.src) this.audio.play().catch(() => this.#setStatus('error'));
+    if (!this.surah) return;
+    // After a change of reciter there is nothing loaded yet.
+    if (!this.audio.src) {
+      this.play(this.surah, this.ayah || 1);
+      return;
+    }
+    this.audio.play().catch(() => this.#setStatus('error'));
   }
 
   get isPlaying() {
@@ -240,9 +325,17 @@ export class QuranPlayer {
   }
 
   /** Which verse is being recited right now? */
-  #track() {
-    if (!this.timings.length || this.audio.paused) return;
+  #track(force = false) {
+    if (!this.timings.length || (this.audio.paused && !force)) return;
     const t = this.audio.currentTime;
+    // Repeating: past the end of the verse, back to its start.
+    if (this.repeat && !force && this.ayah) {
+      const timing = this.timings.find((v) => v.ayah === this.ayah);
+      if (timing && t >= timing.to - 0.05) {
+        this.audio.currentTime = timing.ayah === 1 ? 0 : timing.from;
+        return;
+      }
+    }
     // Before the first verse's own start there is the basmala: count it to verse 1.
     let current = this.timings[0];
     for (const timing of this.timings) {
@@ -252,7 +345,8 @@ export class QuranPlayer {
   }
 
   #surahEnded() {
-    if (this.surah && this.surah < this.surahCount) this.play(this.surah + 1, 1);
+    if (this.repeat && this.surah && this.ayah) this.play(this.surah, this.ayah);
+    else if (this.surah && this.surah < this.surahCount) this.play(this.surah + 1, 1);
     else this.#setStatus('paused');
   }
 }

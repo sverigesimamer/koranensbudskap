@@ -109,17 +109,38 @@ framtagen ur PDF:ernas egen text (versnumren i översättningen) och kontrollera
 mot antalet verser per sura: alla 6 236 verser finns med. `src/quran-index.js`
 är stället där resten av appen frågar "var står versen?" och "vad står på sidan?".
 
-## Mobil
+## Mobil och surfplatta
 
-På en smal skärm i stående läge (`layout.singlePageBelow`, 760 px) visas en sida
-i taget. Svep åt höger för nästa sida och åt vänster för föregående (arabisk
-läsriktning); boken går först till uppslagets andra sida och vänder sedan blad.
-Helskärmsknappen (⛶) uppe till höger går till helskärm och låser skärmen i
-liggande läge, där båda sidorna visas bredvid varandra. På bredare skärmar –
-alltid på desktop – visas två sidor.
+Samma bok, visad på två sätt (`src/mobile-reader.js` på små skärmar, boken med
+uppslag annars). Båda visar samma ställe i boken, samma versmarkeringar och samma
+spelare; byter man storlek eller vrider enheten fortsätter man där man var.
 
-Sidorna renderas finare än de visas (`render.minPixelRatio`) och skalas ned av
-webbläsaren, så att skrift och ornament ser lika rena ut i uppslagsvyn som inzoomat.
+**När visas vad** (`layout` i `src/config.js`, efter fönstrets faktiska mått):
+
+| Skärm | Visning |
+| --- | --- |
+| Stående och smalare än 900 px (telefoner, iPad stående) | en sida i taget |
+| Lägre än 600 px (telefon liggande) | en sida i taget, så bred som ryms (högst 640 px), läses uppifrån och ned |
+| Smalare än 600 px oavsett läge | en sida i taget |
+| Allt annat (desktop, iPad liggande) | boken med två sidor, som tidigare |
+
+**En sida i taget:** sidan är så stor som skärmen tillåter, 10 px från kanterna och
+fri från notch, Dynamic Island och hemindikator (`env(safe-area-inset-*)`). Bara
+aktuell sida och dess två grannar hålls renderade.
+
+| Gest | Resultat |
+| --- | --- |
+| Svep åt höger / vänster | nästa / föregående sida (arabisk läsriktning); sidan glider in och landar |
+| Nyp | zoom kring fingrarna (upp till 4×); sidan renderas om skarpt när zoomen stannat |
+| Dubbeltryck | zooma in där, eller tillbaka ut |
+| Dra när sidan är inzoomad | flytta runt på sidan – sidan byts aldrig av misstag |
+| Tryck | visa / dölj toppfältet och spelaren (de döljs själva efter ett par sekunder) |
+| Håll på en vers | uppläsningen börjar från den versen |
+
+Toppfältet har bara namnet och en navigeringsikon som öppnar "Navigera i
+Koranen" som ett ark nedifrån (Sura, Vers, Juz, Sida och "Gå till sida"). Spelaren
+är en liten list längst ned som öppnas till hela spelaren (tidslinje, upprepa
+versen, hastighet, recitatör) – samma knappar som glider till sina nya platser.
 
 ## Uppläsning och versmarkering
 
@@ -130,12 +151,19 @@ sin arabiska text och sin översättning, och boken bläddrar själv när upplä
 går över till nästa uppslag. Bläddrar du bort slutar boken följa med tills du är
 tillbaka vid versen som läses.
 
-- **Ljud:** inget ligger i projektet. Varje suras ljudfil hämtas från Tarteels CDN
-  (`audio.surahUrl` i `src/config.js`) första gången den spelas – den strömmas
-  direkt och en kopia sparas samtidigt i webbläsarens egen lagring (Cache
-  Storage). Nästa gång spelas suran från den kopian.
-- **Verstider:** hämtas per sura från Quran.com-API:t (`audio.timingsUrl`) och
-  sparas på samma sätt. De innehåller även tider per ord, som inte används än.
+- **Recitatörer:** listan, ljudfilerna och verstiderna kommer från Quran.com:s
+  ljud-API (`api.qurancdn.com`, `src/reciters.js`) – för varje recitatör och sura
+  ger det ljudfilen tillsammans med tider gjorda för just den filen, så
+  versmarkeringen följer vem som än läser. API:t har 14; två är bortvalda (en
+  "Kids repeat"-version med trasiga tider och en dubblett av Alafasy), 12 kan väljas.
+  Mishary al-Afasy spelas som förut från Tarteels CDN. Listan sparas i webbläsaren
+  (fungerar utan nät med senast kända lista), liksom valet av recitatör. Byte av
+  recitatör behåller sura och vers.
+- **Ljud:** inget ligger i projektet. Varje suras ljudfil hämtas första gången den
+  spelas – den strömmas direkt och en kopia sparas samtidigt i webbläsarens egen
+  lagring (Cache Storage). Nästa gång spelas suran från den kopian.
+- **Verstider:** hämtas per sura och recitatör (`audio.timingsUrl`) och sparas på
+  samma sätt. De innehåller även tider per ord, som inte används än.
 - **Versytor:** `data/regions/juz-N.json`, en fil per juz som laddas när en sida
   i den visas. De räknas fram ur PDF:erna av `tools/build-regions.mjs`
   (`node tools/build-regions.mjs`, cirka tio minuter): arabiskan ur versslutens
@@ -164,8 +192,12 @@ src/
   book-model.js         vilken PDF-sida som ligger var (uppslag, blad, RTL)
   book-view.js          den vilande boken i DOM: byter canvas i sidorna
   zoom-view.js          läszoom: boken skalas/panoreras mot sidan, som renderas om skarpt av PDF.js
-  navigator.js          panelen "Navigera i Koranen" (sura / vers / juz / sida)
+  navigator.js          panelen "Navigera i Koranen" (sura / vers / juz / sida; ark på mobil)
+  mobile-reader.js      små skärmar: en sida i taget, svep, nyp-zoom, panorering
   audio-player.js       uppläsning: sura för sura från CDN, sparad i webbläsaren
+  player-ui.js          spelarens ikoner, play/paus-morf, mini- och helspelare, tidslinje
+  reciters.js           recitatörerna (Quran.com:s ljud-API), sparad lista
+  reciter-picker.js     "Välj recitatör"
   verse-regions.js      laddar versytorna (data/regions) för de juz som visas
   printer-marks.js      utelämnar tryckeriets skärmärken när en sida ritas
   quran-index.js        uppslagning surah/ayah <-> PDF-sida <-> regioner

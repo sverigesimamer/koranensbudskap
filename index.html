@@ -10,7 +10,10 @@
   <main class="app-shell">
     <header class="topbar">
       <div class="brand">Koranens Budskap</div>
-      <button id="navBtn" class="ghost-pill nav-btn" type="button" aria-haspopup="dialog" aria-expanded="false">Navigera i Koranen</button>
+      <button id="navBtn" class="ghost-pill nav-btn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Navigera i Koranen">
+        <span class="nav-btn-text">Navigera i Koranen</span>
+        <svg class="icon nav-btn-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 5.8C7.6 5 9.9 5.2 12 6.6c2.1-1.4 4.4-1.6 6.5-.8v12.4c-2.1-.8-4.4-.6-6.5.8-2.1-1.4-4.4-1.6-6.5-.8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 6.6v12.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
       <div class="top-actions">
         <button id="pageInfo" class="ghost-pill" type="button">Sidor</button>
         <button id="fullscreenBtn" class="icon-btn" type="button" aria-label="Helskärm, två sidor" title="Helskärm – två sidor i liggande läge">⛶</button>
@@ -61,17 +64,44 @@
       <div class="credits">Original-PDF renderas oredigerad</div>
       <!-- Right-to-left book: the left button moves on, the right one goes back. -->
       <button id="nextBtn" class="turn-btn" type="button" aria-label="Nästa uppslag" title="Nästa uppslag (←)">‹</button>
+      <!-- One player, two layouts on small screens (mini / full): player-ui.js. -->
       <div id="player" class="player-pill" role="group" aria-label="Uppläsning">
-        <button id="playerPrev" class="player-step" type="button" aria-label="Föregående vers" title="Föregående vers">⏮</button>
-        <button id="playerToggle" class="play-dot" type="button" aria-label="Spela upp">▶</button>
-        <button id="playerNext" class="player-step" type="button" aria-label="Nästa vers" title="Nästa vers">⏭</button>
+        <button id="playerPrev" class="player-step" type="button" aria-label="Föregående vers" title="Föregående vers"></button>
+        <button id="playerToggle" class="play-dot" type="button" aria-label="Spela upp"></button>
+        <button id="playerNext" class="player-step" type="button" aria-label="Nästa vers" title="Nästa vers"></button>
         <span class="player-text">
           <strong id="playerTitle">Lyssna från den här sidan</strong>
-          <small id="playerSub"></small>
+          <button id="playerSub" class="player-sub" type="button" data-opens-reciters aria-haspopup="dialog" title="Byt recitatör"></button>
         </span>
+        <button id="playerReciter" class="player-reciter player-extra player-extra-full" type="button" data-opens-reciters aria-haspopup="dialog">
+          <span class="player-reciter-label">Recitatör</span>
+          <span id="playerReciterName" class="player-reciter-name"></span>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="player-scrub player-extra player-extra-full">
+          <span id="playerTime" class="player-time">0:00</span>
+          <div class="scrub" role="slider" tabindex="0" aria-label="Var i suran" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0">
+            <div class="scrub-track"><div class="scrub-fill"></div></div>
+            <div class="scrub-thumb"></div>
+          </div>
+          <span id="playerDur" class="player-time">–:––</span>
+        </div>
+        <button id="playerRepeat" class="player-opt player-extra player-extra-full" type="button" aria-label="Upprepa versen" aria-pressed="false" title="Upprepa versen"></button>
+        <button id="playerRate" class="player-opt player-rate player-extra player-extra-full" type="button" aria-label="Uppläsningens hastighet" title="Hastighet">1×</button>
+        <button id="playerExpand" class="player-expand player-extra" type="button" aria-label="Visa hela spelaren" aria-expanded="false"></button>
       </div>
       <button id="prevBtn" class="turn-btn" type="button" aria-label="Föregående uppslag" title="Föregående uppslag (→)">›</button>
     </footer>
+
+    <!-- Small screens: one page at a time (mobile-reader.js). The canvas of
+         each page is the same untouched PDF.js rendering as in the book. -->
+    <div id="mReader" class="m-reader" hidden>
+      <div class="m-track">
+        <div class="m-panel"><div class="m-page"><div class="highlight-layer"></div></div></div>
+        <div class="m-panel"><div class="m-page"><div class="highlight-layer"></div></div></div>
+        <div class="m-panel"><div class="m-page"><div class="highlight-layer"></div></div></div>
+      </div>
+    </div>
   </main>
 
   <!-- The turning sheet is drawn here, above the book. -->
@@ -117,7 +147,12 @@
 
   <!-- Only on screen while open (opened with the "Navigera i Koranen" button). -->
   <div id="navPanel" class="nav-panel" role="dialog" aria-label="Navigera i Koranen" hidden>
+    <div class="nav-grip" aria-hidden="true"></div>
     <div class="nav-head">
+      <button type="button" class="nav-back" aria-label="Tillbaka">
+        <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 6.5 9 12l5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <strong class="nav-title">Navigera i Koranen</strong>
       <div class="nav-tabs" role="tablist">
         <button type="button" role="tab" data-tab="surah">Sura</button>
         <button type="button" role="tab" data-tab="verse">Vers</button>
@@ -127,6 +162,17 @@
       <button type="button" class="xbtn nav-close" aria-label="Stäng">×</button>
     </div>
     <div class="nav-body"></div>
+  </div>
+
+  <!-- "Välj recitatör" (reciter-picker.js). -->
+  <div id="reciterSheet" class="reciter-sheet" role="dialog" aria-label="Välj recitatör" hidden>
+    <div class="nav-grip" aria-hidden="true"></div>
+    <div class="reciter-head">
+      <strong>Välj recitatör</strong>
+      <button type="button" class="xbtn reciter-close" aria-label="Stäng">×</button>
+    </div>
+    <input class="nav-search reciter-search" type="search" placeholder="Sök recitatör" autocomplete="off" spellcheck="false" />
+    <div class="reciter-list" role="listbox" aria-label="Recitatörer"></div>
   </div>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>

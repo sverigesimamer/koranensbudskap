@@ -51,10 +51,10 @@ export const CONFIG = {
   // API, and both are kept in the browser's own storage (Cache Storage)
   // after the first time, so a sura is only downloaded once.
   //   {surah3} = sura number with three digits (002), {surah} = plain (2)
+  // Recitation. The reciters, their files and verse timings come from the
+  // Quran.com audio API (see reciters.js); {reciter} is the reciter's id.
   audio: {
-    reciter: 'Mishary Rashid Alafasy',
-    surahUrl: 'https://audio-cdn.tarteel.ai/quran/surah/alafasy/murattal/mp3/{surah3}.mp3',
-    timingsUrl: 'https://api.qurancdn.com/api/qdc/audio/reciters/7/audio_files?chapter={surah}&segments=true',
+    timingsUrl: 'https://api.qurancdn.com/api/qdc/audio/reciters/{reciter}/audio_files?chapter={surah}&segments=true',
     cacheName: 'koranens-budskap-recitation-v1'
   },
 
@@ -129,10 +129,32 @@ export const CONFIG = {
     // Share of the stage the open book may occupy.
     maxWidth: 0.94,
     maxHeight: 0.9,
-    // One page at a time (with a swipe to the next) on an upright screen
-    // narrower than this; two pages side by side everywhere else. Desktop
-    // windows are always two pages.
-    singlePageBelow: 760
+    // (The book's own one-page mode, for narrow upright windows that are not
+    // small enough for the mobile reader below.)
+    singlePageBelow: 760,
+    // The mobile reader (one page at a time, mobile-reader.js) takes over on
+    // an upright screen narrower than compactWidth (phones, tablets held
+    // upright), on a screen lower than compactHeight (phones on their side)
+    // and on anything narrower than compactAlways. Everything else — desktop,
+    // tablets on their side — shows the open book with two pages.
+    compactWidth: 900,
+    compactHeight: 600,
+    compactAlways: 600
+  },
+
+  // The mobile reader.
+  mobile: {
+    sideMargin: 10,        // CSS px beside the page
+    endMargin: 8,          // above and below it (inside the safe area)
+    landscapeMaxWidth: 640, // on a phone lying down the page takes the width, up to this
+    minPixelRatio: 2,      // render at least this many canvas pixels per CSS pixel
+    slideMs: 300,          // a page sliding in
+    maxZoom: 4,
+    doubleTapZoom: 2.4,
+    maxZoomPixels: 9e6,    // the sharper rendering while zoomed, at most
+    dragSlop: 8,           // px before a touch counts as a drag
+    longPressMs: 520,      // hold a verse this long to recite from it
+    hideControlsMs: 3800   // the controls step aside after this long without a touch
   },
 
   // Reading zoom (double-click a page).

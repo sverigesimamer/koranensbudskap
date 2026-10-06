@@ -22,6 +22,8 @@ const fold = (text) => String(text)
  * @property {(printedPage: number) => number} pdfPageOfPrinted
  * @property {(surah: number, ayah: number) => number|null} pdfPageOfVerse
  * @property {() => number|null} currentSurah        sura on the pages now showing
+ * @property {() => number|null} [currentJuz]        juz of the pages now showing
+ * @property {() => number|null} [currentPrinted]    printed number of the page now showing
  */
 
 export class QuranNavigator {
@@ -41,9 +43,12 @@ export class QuranNavigator {
     this.tabs = [...panel.querySelectorAll('.nav-tabs button')];
     this.tab = 'surah';
     this.verseSurah = 1;
+    /** Small screens: the panel is a sheet that opens on an overview. */
+    this.compact = false;
 
     button.addEventListener('click', () => (this.isOpen ? this.close() : this.open()));
     panel.querySelector('.nav-close').addEventListener('click', () => this.close());
+    panel.querySelector('.nav-back')?.addEventListener('click', () => this.show('home'));
     this.tabs.forEach((el) => el.addEventListener('click', () => this.show(el.dataset.tab)));
 
     document.addEventListener('pointerdown', (e) => {
@@ -68,7 +73,7 @@ export class QuranNavigator {
     this.panel.hidden = false;
     this.button.setAttribute('aria-expanded', 'true');
     this.verseSurah = this.data.currentSurah() || this.verseSurah;
-    this.show(this.tab);
+    this.show(this.compact ? 'home' : this.tab === 'home' ? 'surah' : this.tab);
   }
 
   close() {
@@ -162,6 +167,8 @@ export class QuranNavigator {
 
   show(tab) {
     this.tab = tab;
+    this.panel.classList.toggle('is-home', tab === 'home');
+    this.panel.classList.toggle('in-sub', this.compact && tab !== 'home');
     this.tabs.forEach((el) => {
       const on = el.dataset.tab === tab;
       el.classList.toggle('active', on);
@@ -171,6 +178,46 @@ export class QuranNavigator {
     this.body.classList.toggle('two-columns', tab === 'verse');
     const first = this[`render_${tab}`]();
     first.focus({ preventScroll: true });
+  }
+
+  /** The overview of the sheet: where you are, and where to go. */
+  render_home() {
+    const column = document.createElement('div');
+    column.className = 'nav-column nav-home';
+    const surah = this.data.surahs[(this.data.currentSurah() || 1) - 1];
+    const juz = this.data.currentJuz?.();
+    const printed = this.data.currentPrinted?.();
+    const row = (label, value, tab) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'nav-row';
+      btn.innerHTML = '<span class="nav-row-label"></span><span class="nav-row-value"></span><svg class="icon nav-row-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M9.5 6.5 15 12l-5.5 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      btn.querySelector('.nav-row-label').textContent = label;
+      btn.querySelector('.nav-row-value').textContent = value;
+      btn.addEventListener('click', () => this.show(tab));
+      return btn;
+    };
+    column.append(
+      row('Sura', surah ? surah.name : '', 'surah'),
+      row('Vers', 'Välj sura och vers', 'verse'),
+      row('Juz', juz ? String(juz) : '', 'juz'),
+      row('Sida', printed ? String(printed) : '', 'page')
+    );
+    const form = document.createElement('form');
+    form.className = 'nav-goto';
+    form.innerHTML = '<label for="navGotoPage">Gå till sida</label><input id="navGotoPage" type="number" inputmode="numeric" min="1" /><button type="submit">Gå</button>';
+    const input = form.querySelector('input');
+    input.max = String(this.data.pageCount);
+    input.placeholder = printed ? String(printed) : '1';
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const n = Math.round(Number(input.value));
+      if (n >= 1 && n <= this.data.pageCount) this.#go(this.data.pdfPageOfPrinted(n), `Sida ${n}`);
+      else input.select();
+    });
+    column.append(form);
+    this.body.append(column);
+    return column.querySelector('.nav-row');
   }
 
   render_surah() {
