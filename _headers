@@ -1,0 +1,14 @@
+# Cloudflare Pages: the app's code and data are checked again on every visit,
+# so a new version shows at once; the PDF files may be kept for a day.
+/src/*
+  Cache-Control: no-cache
+/data/*
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/styles.css
+  Cache-Control: no-cache
+/
+  Cache-Control: no-cache
+/public/quran-web/*
+  Cache-Control: public, max-age=86400

@@ -611,7 +611,9 @@ export class FlipController {
       const speed = waiting
         ? Math.min(hurryMax, hurrySpeed + hurryPerQueued * (waiting - 1))
         : s.speed || 1;
-      dt *= speed;
+      // A board does not float down its last degrees like paper: once the
+      // cover is landing it comes down firmly, whatever the turn's tempo.
+      dt *= s.cover && s.landing ? Math.max(speed, 1) * CONFIG.flip.coverLanding : speed;
     }
 
     if (s.mode === 'drag' || s.mode === 'peek') {

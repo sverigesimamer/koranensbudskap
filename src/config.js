@@ -193,6 +193,9 @@ export const CONFIG = {
     jumpLandSpeedMax: 2.8,
     // The cover takes this much longer to swing open than a page takes to turn.
     coverSlowdown: 1.5,
+    // How much faster than a page the cover settles once it is about to lie
+    // flat (a stiff board, no long soft landing with a gap at the spine).
+    coverLanding: 2.5,
     // Release speed (page widths per second) that completes a turn by itself.
     flickSpeed: 1.6
   },
