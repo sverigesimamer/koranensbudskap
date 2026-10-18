@@ -177,15 +177,31 @@ export class QuranPlayer {
 
   /** @returns {Promise<VerseTiming[]>} */
   async #loadTimings(surah) {
-    const url = fill(this.config.timingsUrl, surah, this.reciter.id);
+    const own = !!this.reciter.timingsUrl;
+    const url = fill(own ? this.reciter.timingsUrl : this.config.timingsUrl, surah, this.reciter.id);
     const store = await this.#store();
-    let response = store ? await store.match(url) : null;
+    // Our own timings are part of the site and change when a recording is
+    // replaced (with its address), so they are asked for anew each time and
+    // the stored copy is only for when there is no connection. The API's
+    // timings never change: the stored copy is used first.
+    let response = store && !own ? await store.match(url) : null;
     if (!response) {
-      response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      if (store) store.put(url, response.clone()).catch(() => {});
+      try {
+        response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (store) store.put(url, response.clone()).catch(() => {});
+      } catch (err) {
+        response = own && store ? await store.match(url) : null;
+        if (!response) throw err;
+      }
     }
     const data = await response.json();
+    if (own) {
+      // Our own format: {audio, verses: [[start, end], …]} in seconds, verse n at index n - 1.
+      if (!data.audio || !(data.verses || []).length) throw new MissingAudio(`${this.reciter.name}: nothing for sura ${surah}`);
+      this.fileUrl = data.audio;
+      return data.verses.map(([from, to], i) => ({ ayah: i + 1, from, to, words: [] }));
+    }
     const file = data.audio_files && data.audio_files[0];
     if (!file || !file.audio_url || !(file.verse_timings || []).length) {
       throw new MissingAudio(`${this.reciter.name}: nothing for sura ${surah}`);

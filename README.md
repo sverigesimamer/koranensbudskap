@@ -159,6 +159,16 @@ tillbaka vid versen som läses.
   Mishary al-Afasy spelas som förut från Tarteels CDN. Listan sparas i webbläsaren
   (fungerar utan nät med senast kända lista), liksom valet av recitatör. Byte av
   recitatör behåller sura och vers.
+- **Svensk översättning:** står först i "Välj recitatör" och läser upp
+  översättningen på svenska. Inspelningarna (en mp3 per sura, alla 114) ligger i
+  Hidayah-projektets publika Supabase-bucket `quran-audio-sv` (mappen `v1/`), utan
+  nyckel. Verstiderna ligger i det här repot, `data/swedish-audio/NNN.json`, med
+  inspelningens adress, så versmarkering, ⏮ / ⏭ och "upprepa versen" fungerar som
+  för de arabiska recitatörerna. Filerna skrivs av
+  `node tools/build-swedish-audio.mjs [sökväg till Hidayah]` ur Hidayahs register
+  och verifierade tidsfiler, och kontrolleras mot bokens versantal. Byts en
+  inspelning ut i Hidayah: kör verktyget igen. Adressen bär inspelningens
+  sha256 (`?v=`), så webbläsaren hämtar den nya i stället för en sparad kopia.
 - **Ljud:** inget ligger i projektet. Varje suras ljudfil hämtas första gången den
   spelas – den strömmas direkt och en kopia sparas samtidigt i webbläsarens egen
   lagring (Cache Storage). Nästa gång spelas suran från den kopian.
@@ -183,8 +193,10 @@ och inget målas över: de åtta linjerna ritas helt enkelt aldrig
 index.html              sidans DOM: två .page med canvas + lager, plus overlay-canvas
 styles.css              skrivbord, bok, pärm, sidbunt, UI
 serve.mjs / start.cmd   lokal server (stöd för HTTP Range så PDF.js kan strömma PDF:en)
-data/                   vilken vers som står var (quran-data.js) och versytor (regions/)
-tools/                  build-regions.mjs (versytor), slim-pdf.mjs (webbkopior av PDF:erna)
+data/                   vilken vers som står var (quran-data.js), versytor (regions/),
+                        svenska verstider (swedish-audio/)
+tools/                  build-regions.mjs (versytor), slim-pdf.mjs (webbkopior av PDF:erna),
+                        build-swedish-audio.mjs (svenska verstider ur Hidayah)
 src/
   config.js             alla inställningar: sidordning, ljus, böjning, fjädrar
   main.js               startar appen, tangentbord, inställningspanel
@@ -196,7 +208,7 @@ src/
   mobile-reader.js      små skärmar: en sida i taget, svep, nyp-zoom, panorering
   audio-player.js       uppläsning: sura för sura från CDN, sparad i webbläsaren
   player-ui.js          spelarens ikoner, play/paus-morf, mini- och helspelare, tidslinje
-  reciters.js           recitatörerna (Quran.com:s ljud-API), sparad lista
+  reciters.js           recitatörerna (Quran.com:s ljud-API) och svensk översättning, sparad lista
   reciter-picker.js     "Välj recitatör"
   verse-regions.js      laddar versytorna (data/regions) för de juz som visas
   printer-marks.js      utelämnar tryckeriets skärmärken när en sida ritas

@@ -18,6 +18,8 @@
  * @property {string} [style]       Murattal, Mujawwad, Muallim …
  * @property {string} [qirat]       Hafs …
  * @property {string} [surahUrl]    our own file address ({surah3}, {surah}); else the API's file is played
+ * @property {string} [timingsUrl]  our own timings ({surah3}, {surah}), each giving its file's address;
+ *                                  else the API's timings and file are used
  */
 
 const API = 'https://api.qurancdn.com/api/qdc/audio/reciters';
@@ -42,6 +44,20 @@ const OWN_FILES = {
  */
 const LEFT_OUT = new Set([168, 173]);
 
+/**
+ * The Swedish reading of the translation (Bernström, as printed in the book).
+ * The recordings are in the Hidayah project's public Supabase bucket
+ * `quran-audio-sv`; the verse times, with each recording's address, are in
+ * data/swedish-audio (built by tools/build-swedish-audio.mjs). Its id is
+ * negative so it can never be one of the API's. It is always first in the list.
+ */
+export const SWEDISH_RECITER_ID = -1;
+const SWEDISH = {
+  id: SWEDISH_RECITER_ID, name: 'Svensk översättning', style: 'Uppläsning på svenska',
+  timingsUrl: './data/swedish-audio/{surah3}.json'
+};
+const withSwedish = (list) => [SWEDISH, ...list.filter((r) => r.id !== SWEDISH_RECITER_ID)];
+
 /** Used when nothing can be fetched and nothing is kept. */
 const FALLBACK = [{
   id: 7, reciterId: 6, name: 'Mishari Rashid al-`Afasy', arabicName: 'مشاري راشد العفاسي',
@@ -60,7 +76,7 @@ const kept = () => {
 
 /** Whatever is at hand right away: the kept list, or the default reciter. */
 export function recitersAtHand() {
-  return kept() || FALLBACK;
+  return withSwedish(kept() || FALLBACK);
 }
 
 /** The API's list, made into Reciters (kept for next time). Falls back quietly. */
@@ -87,7 +103,7 @@ export async function fetchReciters() {
       .sort((a, b) => a.name.localeCompare(b.name, 'en') || (a.style === 'Murattal' ? -1 : b.style === 'Murattal' ? 1 : (a.style || '').localeCompare(b.style || '')));
     if (!list.length) throw new Error('empty list');
     keep(list);
-    return list;
+    return withSwedish(list);
   } catch (err) {
     console.warn('Reciter list not available', err);
     return recitersAtHand();
