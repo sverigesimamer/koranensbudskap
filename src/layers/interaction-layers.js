@@ -20,7 +20,7 @@ function place(el, [x, y, w, h]) {
  * Fill a page's hotspot layer: one invisible click target per area of each
  * verse (its Arabic lines and its translation). Clicking one dispatches a
  * bubbling `verse:activate` event with { surah, ayah, key, pdfPage }; main.js
- * starts the recitation there. Pointing at a verse shades all its areas
+ * marks and chooses that verse (play starts there). Pointing at a verse shades all its areas
  * lightly, so it is clear what a click will choose.
  */
 export function renderHotspots(layer, pdfPage, { debug = false } = {}) {

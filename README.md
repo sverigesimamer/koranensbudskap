@@ -57,7 +57,10 @@ För att visa originalen i stället: sätt `pdfBase` i `src/config.js` till
 
 ## Bläddra
 
-Appen startar med boken stängd. Pärmarna är styva skivor, lite större än sidorna
+Första gången visar appen boken stängd, och efter en sekund (`autoOpenMs` i
+`src/config.js`) slår pärmen upp sig själv på Al-Fatihah. Sidan man läser sparas i
+webbläsaren (`kb-page`), så nästa besök öppnar boken direkt där man var, både i
+boken och i mobilvisningen. Pärmarna är styva skivor, lite större än sidorna
 och tydligt tjockare, som svänger kring bokryggen i stället för att böjas.
 Omslagsbilden (`public/cover/cover.jpg`) används på båda pärmarna: baksidan
 exakt som bilden, framsidan spegelvänd så att ornamentet hamnar vid ryggen, med
@@ -75,7 +78,7 @@ titelringen rättvänd. Bild och beskärning ställs in under `cover` i
 | Klick på en sidkant, `←` / `→`, `PageDown` / `PageUp` | Sidan vänds av sig själv. Klick på kanten medan ett blad ännu är i luften köas som knapparnas, så snabba klick bläddrar snabbt |
 | Håll musen över en sidkant | Kanten lyfter lite. Bara de yttersta cirka 1 cm av sidan svarar (`grabZone*` i `src/config.js`) |
 | Knapparna ‹ › längst ned | Nästa / föregående uppslag. Snabba klick köas – varje klick räknas och bladen vänds fortare ju fler som väntar |
-| Dubbelklicka / dubbeltryck på en sida | Kameran zoomar in mot sidan till full bredd; scrolla för att läsa |
+| Dubbelklicka / dubbeltryck var som helst på den öppna boken | Kameran zoomar in mot sidan (utanför sidorna: närmaste sida med innehåll) till full bredd; scrolla för att läsa |
 | Dubbelklick igen, `Esc` eller "Visa uppslag" | Zoomar ut till uppslaget |
 
 ## Innehåll: 30 juz som en bok
@@ -135,7 +138,7 @@ aktuell sida och dess två grannar hålls renderade.
 | Dubbeltryck | zooma in där, eller tillbaka ut |
 | Dra när sidan är inzoomad | flytta runt på sidan – sidan byts aldrig av misstag |
 | Tryck | visa / dölj toppfältet och spelaren (de döljs själva efter ett par sekunder) |
-| Håll på en vers | uppläsningen börjar från den versen |
+| Håll på en vers | versen markeras och väljs; play börjar där (pågår uppläsningen flyttar den dit) |
 
 Toppfältet har bara namnet och en navigeringsikon som öppnar "Navigera i
 Koranen" som ett ark nedifrån (Sura, Vers, Juz, Sida och "Gå till sida"). Spelaren
@@ -144,9 +147,11 @@ versen, hastighet, recitatör) – samma knappar som glider till sina nya platse
 
 ## Uppläsning och versmarkering
 
-Spelaren längst ned läser upp en sura i taget. Play startar vid första versen på
-uppslaget, ⏮ / ⏭ stegar en vers, och ett klick på en vers (arabisk text eller
-översättning) börjar läsa därifrån. Versen som läses får en grå skugga över både
+Spelaren längst ned läser upp en sura i taget. Ingenting börjar spela av sig
+själv: ett klick på en vers (arabisk text eller översättning) markerar och väljer
+den, och först play börjar läsa därifrån. Utan vald vers startar play vid första
+versen på uppslaget. Pågår uppläsningen redan flyttar ett klick på en vers den
+dit. ⏮ / ⏭ stegar en vers. Versen som läses får en grå skugga över både
 sin arabiska text och sin översättning, och boken bläddrar själv när uppläsningen
 går över till nästa uppslag. Bläddrar du bort slutar boken följa med tills du är
 tillbaka vid versen som läses.

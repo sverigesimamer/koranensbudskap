@@ -95,9 +95,11 @@ export const CONFIG = {
     // Book page shown at start. Page 1 is the cover: the book starts closed.
     startPage: 1,
 
-    // The closed book stays a moment, then opens by itself on Al-Fatihah
-    // (milliseconds after the cover is shown; 0 = wait for a click).
-    autoOpenMs: 2000,
+    // The first time (nothing remembered in this browser) the closed book
+    // stays a moment, then opens by itself on Al-Fatihah (milliseconds after
+    // the cover is shown; 0 = wait for a click). Later visits open on the
+    // page the reader was on (main.js, 'kb-page').
+    autoOpenMs: 1000,
     // Tempo of the opening cover: 1 = as fast as a page turned by a click,
     // 0.5 = twice as long.
     openingSpeed: 0.5,

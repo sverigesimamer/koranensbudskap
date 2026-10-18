@@ -13,7 +13,8 @@ import { PlayerUI } from './player-ui.js';
 import { recitersAtHand, fetchReciters, DEFAULT_RECITER_ID } from './reciters.js';
 import { ReciterPicker } from './reciter-picker.js';
 
-// Small settings remembered in this browser (night mode, reciter).
+// Small settings remembered in this browser (night mode, reciter, the page
+// the reader was on).
 const remember = (key, value) => { try { localStorage.setItem(key, value); } catch { /* private mode */ } };
 const recall = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 
@@ -48,6 +49,9 @@ async function start() {
   let pendingFocus = null;
   let following = true;
   let verseClick = 0;
+  /** A verse the reader clicked while nothing was playing: it stays marked,
+   *  and play starts there. Cleared once the recitation moves on. */
+  let chosen = null;
   let playerRef = null;
   // Phones and narrow tablets show one page at a time (the mobile reader);
   // everything else the open book. Both show the same place in the book.
@@ -94,6 +98,9 @@ async function start() {
       ? 'Klicka på boken för att öppna den'
       : 'Dra i en sidkant för att bläddra · dubbelklicka på en sida för att zooma · ← nästa · → föregående';
     pageInfo.title = [right, left].map(pdfPage).filter(Boolean).map((p) => QuranIndex.pageLabel(p)).join(' | ');
+    // Where the reader is, to open there next time (not the closed book).
+    const here = compact ? mobile?.page : !view.isClosed && desktopPage();
+    if (here) remember('kb-page', String(here));
   }
 
   let flip = null;
@@ -168,7 +175,18 @@ async function start() {
 
   view.layout();
   const startCompact = wantsCompact();
-  if (!startCompact) await goToSpread(model.spreadOfPage(CONFIG.book.startPage));
+  // Back again: the book opens where the reader left it. The first time it
+  // shows the cover and opens by itself on Al-Fatihah (autoOpenMs, below).
+  const savedPage = Number(recall('kb-page'));
+  const resumePage = Number.isInteger(savedPage) && savedPage >= source.bookPageOf(1) &&
+    savedPage <= source.bookPageOf(source.pdfPageCount) ? savedPage : null;
+  if (!startCompact) {
+    await goToSpread(model.spreadOfPage(resumePage || CONFIG.book.startPage));
+    if (resumePage) view.focusPage(resumePage, false);
+    // The cover opens onto Al-Fatihah in a moment: render it first, ahead of
+    // the background preloading, so the cover can swing up on time.
+    else if (CONFIG.book.autoOpenMs > 0) view.whenSpreadReady(model.spreadOfPage(fatihaPage())).catch(() => {});
+  }
 
   // ---- input ----
   window.addEventListener('keydown', (e) => {
@@ -331,10 +349,20 @@ async function start() {
     clearTimeout(verseClick);
     // A click on a page edge has already started turning the leaf.
     if (flip?.busy || view.isClosed) return;
-    const pageEl = e.target.closest('.page');
-    if (!pageEl || pageEl.classList.contains('is-empty')) return;
+    // Anywhere on the open book: the page clicked, else (cover edge, spine,
+    // the blank page beside the first one) the nearest page with content.
+    const pages = [...$('#book').querySelectorAll('.page')]
+      .filter((p) => !p.classList.contains('is-empty') && p.getBoundingClientRect().width > 0);
+    if (!pages.length) return;
+    const across = (p) => {
+      const r = p.getBoundingClientRect();
+      return e.clientX < r.left ? r.left - e.clientX : e.clientX > r.right ? e.clientX - r.right : 0;
+    };
+    const hit = e.target.closest('.page');
+    const pageEl = pages.includes(hit) ? hit : pages.reduce((a, b) => (across(b) < across(a) ? b : a));
     const rect = pageEl.getBoundingClientRect();
-    zoom.open(pageEl.classList.contains('page-left') ? 'left' : 'right', (e.clientY - rect.top) / rect.height);
+    const at = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
+    zoom.open(pageEl.classList.contains('page-left') ? 'left' : 'right', at);
   });
   doubleTap($('#zoomView'), () => {
     clearTimeout(verseClick);
@@ -431,6 +459,7 @@ async function start() {
     reciter: reciterById(savedReciter) || reciterById(DEFAULT_RECITER_ID) || reciters[0],
     surahCount: QuranIndex.surahs.length,
     onVerse: (surah, ayah) => {
+      chosen = null;
       view.highlighted = new Set([`${surah}:${ayah}`]);
       view.refreshLayers();
       const versePage = source.bookPageOf(QuranIndex.pageOfVerse(surah, ayah));
@@ -502,6 +531,12 @@ async function start() {
     const name = reciter ? reciter.name : '';
     $('#playerReciterName').textContent = name;
     playerEl.classList.toggle('has-status', status === 'loading' || status === 'error');
+    if (chosen && status !== 'playing' && status !== 'loading') {
+      // A verse is chosen: play starts there.
+      playerTitle.textContent = `${QuranIndex.surahs[chosen.surah - 1].name} ${chosen.surah}:${chosen.ayah}`;
+      playerSub.textContent = name;
+      return;
+    }
     if (surah) {
       playerTitle.textContent = `${QuranIndex.surahs[surah - 1].name} ${surah}:${ayah}`;
       playerSub.textContent = status === 'error'
@@ -529,9 +564,31 @@ async function start() {
     player.play(surah, ayah);
   };
 
+  /**
+   * A click (or, on a phone, a long press) on a verse. Nothing starts: the
+   * verse is marked and chosen, and play starts from it. While the
+   * recitation is already going on it moves to that verse instead.
+   */
+  const chooseVerse = (surah, ayah) => {
+    if (player.isPlaying) {
+      playVerse(surah, ayah);
+      return;
+    }
+    chosen = { surah, ayah };
+    view.highlighted = new Set([`${surah}:${ayah}`]);
+    view.refreshLayers();
+    if (compact) {
+      mobile.highlighted = view.highlighted;
+      mobile.refreshLayers();
+    }
+    refreshPlayerText();
+  };
+
   playerToggle.addEventListener('click', () => {
     if (player.isPlaying) {
       player.pause();
+    } else if (chosen && verseShowing(chosen.surah, chosen.ayah)) {
+      playVerse(chosen.surah, chosen.ayah);
     } else if (player.state.surah && verseShowing(player.state.surah, player.state.ayah)) {
       following = true;
       player.resume();
@@ -546,12 +603,12 @@ async function start() {
   $('#playerPrev').addEventListener('click', () => { following = true; player.step(-1); });
   $('#playerNext').addEventListener('click', () => { following = true; player.step(1); });
 
-  // A click on a verse recites from it. The click waits a moment, so that a
-  // double-click (zoom) does not also start the recitation.
+  // A click on a verse chooses it (see chooseVerse). The click waits a
+  // moment, so that a double-click (zoom) does not also move the recitation.
   $('#stage').addEventListener('verse:activate', (e) => {
     clearTimeout(verseClick);
     const { surah, ayah } = e.detail;
-    verseClick = setTimeout(() => playVerse(surah, ayah), 280);
+    verseClick = setTimeout(() => chooseVerse(surah, ayah), 280);
   });
   view.onRegions = () => { if (zoom.isOpen) zoom.refreshLayers(); };
 
@@ -625,13 +682,14 @@ async function start() {
     onPage: () => updateInfo(),
     onTap: () => toggleControls(),
     onLongPress: ({ pdfPage: page, x, y }) => {
-      // Hold a verse to recite from it.
+      // Hold a verse to choose it (see chooseVerse).
       const region = QuranIndex.regionsOnPage(page).find((r) => r.areas.some(([ax, ay, aw, ah]) =>
         x >= ax && x <= ax + aw && y >= ay && y <= ay + ah));
       if (!region) return;
       navigator.vibrate?.(12);
-      playVerse(region.surah, region.ayah);
-      showToast(`${QuranIndex.surahs[region.surah - 1].name} ${region.surah}:${region.ayah}`);
+      const playing = player.isPlaying;
+      chooseVerse(region.surah, region.ayah);
+      showToast(`${QuranIndex.surahs[region.surah - 1].name} ${region.surah}:${region.ayah}${playing ? '' : ' · tryck på play'}`);
     },
     onBlocked: (dir) => showToast(dir === 'next' ? 'Sista sidan' : 'Första sidan')
   });
@@ -685,7 +743,7 @@ async function start() {
     updateInfo();
   }
 
-  if (startCompact) setCompact(true, fatihaPage());
+  if (startCompact) setCompact(true, resumePage || fatihaPage());
   updateInfo();
   $('#loading').hidden = true;
   document.body.classList.add('ready');
