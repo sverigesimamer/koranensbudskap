@@ -159,8 +159,8 @@ tillbaka vid versen som läses.
   Mishary al-Afasy spelas som förut från Tarteels CDN. Listan sparas i webbläsaren
   (fungerar utan nät med senast kända lista), liksom valet av recitatör. Byte av
   recitatör behåller sura och vers.
-- **Svensk översättning:** står först i "Välj recitatör" och läser upp
-  översättningen på svenska. Inspelningarna (en mp3 per sura, alla 114) ligger i
+- **Svensk översättning:** står först i "Välj recitatör", är förvald för den som
+  inte har valt någon annan, och läser upp översättningen på svenska. Inspelningarna (en mp3 per sura, alla 114) ligger i
   Hidayah-projektets publika Supabase-bucket `quran-audio-sv` (mappen `v1/`), utan
   nyckel. Verstiderna ligger i det här repot, `data/swedish-audio/NNN.json`, med
   inspelningens adress, så versmarkering, ⏮ / ⏭ och "upprepa versen" fungerar som

@@ -25,8 +25,6 @@
 const API = 'https://api.qurancdn.com/api/qdc/audio/reciters';
 const STORE_KEY = 'kb-reciters-v1';
 
-export const DEFAULT_RECITER_ID = 7;
-
 /**
  * Mishary Rashid al-Afasy is played from the Tarteel CDN, as before (the
  * same recording as the API's, so its timings fit).
@@ -56,6 +54,8 @@ const SWEDISH = {
   id: SWEDISH_RECITER_ID, name: 'Svensk översättning', style: 'Uppläsning på svenska',
   timingsUrl: './data/swedish-audio/{surah3}.json'
 };
+/** What plays until the reader chooses someone else: the Swedish reading. */
+export const DEFAULT_RECITER_ID = SWEDISH_RECITER_ID;
 const withSwedish = (list) => [SWEDISH, ...list.filter((r) => r.id !== SWEDISH_RECITER_ID)];
 
 /** Used when nothing can be fetched and nothing is kept. */
