@@ -168,9 +168,14 @@ export const CONFIG = {
   },
 
   flip: {
-    // Share of the page width (from the outer edge) that grabs the page.
-    grabZone: 0.16,
-    grabZoneTouch: 0.24,
+    // How far in from the outer edge a pointer grabs (and hover lifts) the
+    // page: a share of the page width, but never more than the cap in CSS px
+    // (40 px is about 1 cm on screen), so on a large screen only the edge
+    // itself responds. A finger is less precise and gets a little more.
+    grabZone: 0.07,
+    grabZoneMaxPx: 40,
+    grabZoneTouch: 0.11,
+    grabZoneTouchMaxPx: 60,
     // Hover "peek": how far the edge lifts, as a share of the page width.
     peek: 0.075,
     // Sheet shape (see curl-solver.js).

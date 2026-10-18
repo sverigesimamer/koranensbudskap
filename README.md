@@ -72,8 +72,8 @@ titelringen rättvänd. Bild och beskärning ställs in under `cover` i
 | Dra i höger sidkant åt vänster | Föregående uppslag |
 | Släpp efter halva vägen / snabb svepning | Sidan vänds klart |
 | Släpp tidigare | Sidan fjädrar tillbaka |
-| Klick på en sidkant, `←` / `→`, `PageDown` / `PageUp` | Sidan vänds av sig själv |
-| Håll musen över en sidkant | Kanten lyfter lite |
+| Klick på en sidkant, `←` / `→`, `PageDown` / `PageUp` | Sidan vänds av sig själv. Klick på kanten medan ett blad ännu är i luften köas som knapparnas, så snabba klick bläddrar snabbt |
+| Håll musen över en sidkant | Kanten lyfter lite. Bara de yttersta cirka 1 cm av sidan svarar (`grabZone*` i `src/config.js`) |
 | Knapparna ‹ › längst ned | Nästa / föregående uppslag. Snabba klick köas – varje klick räknas och bladen vänds fortare ju fler som väntar |
 | Dubbelklicka / dubbeltryck på en sida | Kameran zoomar in mot sidan till full bredd; scrolla för att läsa |
 | Dubbelklick igen, `Esc` eller "Visa uppslag" | Zoomar ut till uppslaget |

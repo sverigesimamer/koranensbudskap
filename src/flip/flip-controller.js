@@ -72,7 +72,10 @@ export class FlipController {
   /** Which page edge (if any) a viewport point grabs. */
   #hitZone(clientX, clientY, pointerType) {
     const m = this.view.metrics();
-    const zone = m.pageW * (pointerType === 'touch' ? CONFIG.flip.grabZoneTouch : CONFIG.flip.grabZone);
+    const f = CONFIG.flip;
+    const zone = pointerType === 'touch'
+      ? Math.min(m.pageW * f.grabZoneTouch, f.grabZoneTouchMaxPx)
+      : Math.min(m.pageW * f.grabZone, f.grabZoneMaxPx);
     const y = clientY - m.top;
     if (y < -8 || y > m.pageH + 8) return null;
     const dx = clientX - m.spineX;
@@ -435,8 +438,19 @@ export class FlipController {
   #onPointerDown(e) {
     if (!this.enabled || e.button !== 0) return;
     if (this.#hitZone(e.clientX, e.clientY, e.pointerType)) this.#skipTail();
-    if (this.busy) return;
     const dir = this.#hitZone(e.clientX, e.clientY, e.pointerType);
+    if (this.busy) {
+      // A sheet is still in the air: a press on a page edge is a click that
+      // turns the next leaf, queued like the buttons' clicks (see turn), so
+      // quick clicking on the edges pages through quickly. Not during a jump.
+      if (dir && !this.jump) {
+        this.turn(dir);
+        this.suppressClick = true;
+        setTimeout(() => { this.suppressClick = false; }, 600);
+        if (e.pointerType !== 'touch') e.preventDefault();
+      }
+      return;
+    }
     if (!dir) return;
 
     let s = this.session;
