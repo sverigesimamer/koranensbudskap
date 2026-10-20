@@ -102,7 +102,7 @@ export const CONFIG = {
     autoOpenMs: 1000,
     // Tempo of the opening cover: 1 = as fast as a page turned by a click,
     // 0.5 = twice as long.
-    openingSpeed: 0.5,
+    openingSpeed: 1,
 
     // The number printed on a page = its page number in the PDF files + this
     // (the first PDF page is unnumbered, so the page printed "1" is PDF page 2).
